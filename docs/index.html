@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SRE Copilot — Complete Documentation</title>
+<style>
+/* ─── Reset & Variables ──────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#050d1f;--surface:#0a1628;--surface2:#111e35;--surface3:#1a2d4a;
+  --border:#162340;--border2:#1e3050;--border3:#2a4060;
+  --accent:#3b82f6;--accent2:#60a5fa;--accent3:#93c5fd;
+  --green:#22c55e;--green2:#4ade80;--red:#ef4444;--red2:#f87171;
+  --amber:#f59e0b;--amber2:#fbbf24;--purple:#a855f7;--purple2:#c084fc;
+  --cyan:#06b6d4;--cyan2:#22d3ee;--rose:#f43f5e;--teal:#14b8a6;
+  --text:#e2e8f0;--text-muted:#94a3b8;--text-dim:#4a6280;
+  --font-mono:'JetBrains Mono','Fira Code','Cascadia Code',monospace;
+  --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --r:10px;--r-lg:16px;--shadow:0 8px 32px rgba(0,0,0,.5);
+  --shadow-lg:0 20px 60px rgba(0,0,0,.6);
+}
+html{scroll-behavior:smooth;font-size:16px}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden}
+
+/* ─── Typography ─────────────────────────────────────────────────────────── */
+h1{font-size:clamp(2.2rem,5vw,4rem);font-weight:800;letter-spacing:-1.5px;line-height:1.1}
+h2{font-size:clamp(1.5rem,3vw,2rem);font-weight:700;letter-spacing:-.5px;margin-bottom:1rem}
+h3{font-size:1.1rem;font-weight:600;color:var(--accent2);margin-bottom:.6rem}
+h4{font-size:.875rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:.5rem}
+p{color:var(--text-muted);margin-bottom:.9rem}
+p:last-child{margin-bottom:0}
+a{color:var(--accent2);text-decoration:none;transition:color .15s}
+a:hover{color:#fff}
+strong,b{color:var(--text)}
+em{color:var(--amber2)}
+code{font-family:var(--font-mono);font-size:.82em;background:rgba(59,130,246,.08);padding:.15rem .4rem;border-radius:4px;color:var(--accent3)}
+pre{
+  background:#02091a;border:1px solid var(--border2);border-radius:var(--r);
+  padding:1.5rem;overflow-x:auto;font-family:var(--font-mono);font-size:.8rem;
+  line-height:1.8;color:#c9d1d9;margin:1.25rem 0;position:relative;
+}
+pre .k{color:#ff7b72}  pre .s{color:#a5d6ff}  pre .c{color:#48545e;font-style:italic}
+pre .f{color:#d2a8ff}  pre .n{color:#79c0ff}   pre .o{color:#ffa657}
+ul,ol{padding-left:1.5rem;color:var(--text-muted)}
+li{margin-bottom:.35rem}
+li strong{color:var(--text)}
+
+/* ─── Layout ──────────────────────────────────────────────────────────────── */
+.container{max-width:1200px;margin:0 auto;padding:0 1.5rem}
+.wide{max-width:1400px}
+section{padding:4.5rem 0;border-bottom:1px solid var(--border)}
+section:last-child{border-bottom:none}
+
+/* ─── Navigation ─────────────────────────────────────────────────────────── */
+nav{
+  position:sticky;top:0;z-index:200;
+  background:rgba(5,13,31,.92);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;padding:.8rem 0}
+.nav-logo{display:flex;align-items:center;gap:.6rem;font-weight:700;font-size:1.05rem;color:var(--text)}
+.nav-pulse{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)}}
+.nav-links{display:flex;gap:1.5rem;flex-wrap:wrap}
+.nav-links a{font-size:.8rem;color:var(--text-dim);transition:color .15s}
+.nav-links a:hover{color:var(--text)}
+@media(max-width:900px){.nav-links{display:none}}
+
+/* ─── Hero ────────────────────────────────────────────────────────────────── */
+.hero{
+  padding:6rem 0 4rem;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -5%, rgba(59,130,246,.15) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 30% at 80% 90%, rgba(168,85,247,.08) 0%, transparent 60%);
+  border-bottom:1px solid var(--border);
+}
+.hero-kicker{
+  display:inline-flex;align-items:center;gap:.5rem;
+  background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);
+  color:var(--accent2);padding:.3rem 1rem;border-radius:999px;
+  font-size:.78rem;font-weight:600;letter-spacing:.5px;margin-bottom:1.5rem;
+}
+.hero h1{margin-bottom:1.25rem}
+.hero h1 .g1{
+  background:linear-gradient(135deg,#60a5fa,#a855f7);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.hero-sub{font-size:1.1rem;max-width:700px;margin-bottom:2.5rem;line-height:1.75}
+.badge-row{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:2.5rem}
+.badge{
+  display:inline-flex;align-items:center;gap:.3rem;
+  padding:.25rem .75rem;border-radius:999px;
+  font-size:.7rem;font-weight:600;letter-spacing:.3px;border:1px solid;
+}
+.b-blue {background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#93c5fd}
+.b-purple{background:rgba(168,85,247,.1);border-color:rgba(168,85,247,.3);color:#c4b5fd}
+.b-green {background:rgba(34,197,94,.1); border-color:rgba(34,197,94,.3); color:#86efac}
+.b-amber {background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#fde68a}
+.b-cyan  {background:rgba(6,182,212,.1); border-color:rgba(6,182,212,.3); color:#a5f3fc}
+.b-rose  {background:rgba(244,63,94,.1); border-color:rgba(244,63,94,.3); color:#fda4af}
+.cta-row{display:flex;gap:1rem;flex-wrap:wrap}
+.btn{
+  padding:.75rem 1.75rem;border-radius:8px;font-weight:600;font-size:.9rem;
+  transition:all .2s;cursor:pointer;display:inline-block;
+}
+.btn-solid{background:var(--accent);color:#fff}
+.btn-solid:hover{background:#2563eb;transform:translateY(-1px);color:#fff}
+.btn-ghost{background:transparent;color:var(--text-muted);border:1px solid var(--border3)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--text)}
+
+/* ─── Metric strip ────────────────────────────────────────────────────────── */
+.metric-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;background:var(--border)}
+.metric{background:var(--surface);padding:1.4rem 1rem;text-align:center}
+.metric-val{font-size:1.9rem;font-weight:800;color:var(--accent2);line-height:1}
+.metric-lbl{font-size:.65rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-top:.35rem}
+
+/* ─── Cards ───────────────────────────────────────────────────────────────── */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1.1rem;margin:1.5rem 0}
+.card{
+  background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);
+  padding:1.4rem;transition:border-color .2s,transform .15s;
+}
+.card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.card-icon{font-size:1.6rem;margin-bottom:.75rem}
+.card h3{color:var(--text);font-size:.95rem;margin-bottom:.4rem}
+.card p{font-size:.82rem}
+
+/* ─── Section header ─────────────────────────────────────────────────────── */
+.sec-eye{font-size:.72rem;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:.4rem}
+.sec-hr{width:48px;height:2px;background:linear-gradient(to right,var(--accent),transparent);border:none;margin:1.25rem 0}
+
+/* ─── Tables ──────────────────────────────────────────────────────────────── */
+.tw{overflow-x:auto;margin:1.25rem 0}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+th{background:var(--surface2);color:var(--text-muted);padding:.7rem 1rem;text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border2)}
+td{padding:.7rem 1rem;border-bottom:1px solid var(--border);color:var(--text-muted)}
+tr:hover td{background:rgba(255,255,255,.01)}
+
+/* ─── Callouts ────────────────────────────────────────────────────────────── */
+.callout{border-left:3px solid;border-radius:0 var(--r) var(--r) 0;padding:1rem 1.3rem;margin:1.25rem 0}
+.callout p{margin:0;font-size:.875rem}
+.callout-info{background:rgba(59,130,246,.06);border-color:var(--accent)}
+.callout-warn{background:rgba(245,158,11,.06);border-color:var(--amber)}
+.callout-danger{background:rgba(239,68,68,.06);border-color:var(--red)}
+.callout-idea{background:rgba(168,85,247,.06);border-color:var(--purple)}
+.callout-ok{background:rgba(34,197,94,.06);border-color:var(--green)}
+
+/* ─── Tabs ────────────────────────────────────────────────────────────────── */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border2);margin-bottom:1.5rem;overflow-x:auto}
+.tab-btn{
+  padding:.6rem 1.2rem;background:none;border:none;cursor:pointer;
+  color:var(--text-dim);font-size:.82rem;font-family:inherit;white-space:nowrap;
+  border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;
+}
+.tab-btn:hover{color:var(--text-muted)}
+.tab-btn.active{color:var(--accent2);border-bottom-color:var(--accent)}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+
+/* ─── Agent flow ──────────────────────────────────────────────────────────── */
+.pipeline{display:flex;flex-direction:column;gap:0;position:relative;padding-left:4rem;margin:2rem 0}
+.pipeline::before{
+  content:'';position:absolute;left:1.75rem;top:1.5rem;bottom:1.5rem;
+  width:2px;background:linear-gradient(to bottom,var(--accent) 0%,var(--purple) 60%,var(--green) 100%);
+}
+.pipe-step{display:flex;gap:1.25rem;align-items:flex-start;margin-bottom:1.25rem;position:relative}
+.pipe-num{
+  position:absolute;left:-4rem;width:40px;height:40px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;
+  border:2px solid;z-index:1;flex-shrink:0;
+}
+.pipe-body{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:1.2rem;flex:1}
+.pipe-body h3{font-size:.95rem;color:var(--text);margin-bottom:.35rem}
+.pipe-body p{font-size:.82rem;margin-bottom:.6rem}
+.pipe-tags{display:flex;gap:.4rem;flex-wrap:wrap}
+.ptag{
+  padding:.15rem .55rem;border-radius:999px;font-size:.68rem;font-weight:600;
+  background:rgba(59,130,246,.1);color:var(--accent2);border:1px solid rgba(59,130,246,.2);
+}
+.ptag-p{background:rgba(168,85,247,.1);color:var(--purple2);border-color:rgba(168,85,247,.2)}
+.ptag-g{background:rgba(34,197,94,.1);color:var(--green2);border-color:rgba(34,197,94,.2)}
+.ptag-a{background:rgba(245,158,11,.1);color:var(--amber2);border-color:rgba(245,158,11,.2)}
+
+/* ─── Topic pill ──────────────────────────────────────────────────────────── */
+.tp{display:inline-block;font-family:var(--font-mono);font-size:.68rem;padding:.15rem .5rem;
+    border-radius:4px;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.2);color:var(--cyan2)}
+
+/* ─── Feature row ─────────────────────────────────────────────────────────── */
+.feature-row{display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:start;margin:2rem 0}
+@media(max-width:768px){.feature-row{grid-template-columns:1fr}}
+
+/* ─── Edge case table ────────────────────────────────────────────────────── */
+.ec-table{width:100%;border-collapse:collapse;font-size:.8rem;margin:1.25rem 0}
+.ec-table th{background:var(--surface2);color:var(--text-muted);padding:.65rem .9rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border2)}
+.ec-table td{padding:.65rem .9rem;border-bottom:1px solid var(--border);color:var(--text-muted);vertical-align:top}
+.ec-table td:first-child{color:var(--red2);font-family:var(--font-mono);font-size:.75rem}
+.ec-table td:nth-child(2){color:var(--amber2)}
+.ec-table td:nth-child(3){color:var(--green2)}
+.ec-table tr:hover td{background:rgba(255,255,255,.01)}
+
+/* ─── Decision card ───────────────────────────────────────────────────────── */
+.decision{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:1.5rem;margin:1rem 0}
+.decision h3{color:var(--text);font-size:1rem;margin-bottom:.4rem}
+.decision .vs{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:.75rem 0}
+.option{border-radius:8px;padding:.9rem 1rem}
+.option-chosen{background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2)}
+.option-rejected{background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.15)}
+.option h4{font-size:.75rem;margin-bottom:.3rem}
+.option-chosen h4{color:var(--green2)}
+.option-rejected h4{color:var(--red2)}
+.option p{font-size:.78rem;margin:0}
+
+/* ─── Roadmap ─────────────────────────────────────────────────────────────── */
+.roadmap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:1rem;margin:1.5rem 0}
+.rm-card{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:1.2rem}
+.rm-card .phase{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:.5rem;padding:.2rem .5rem;border-radius:4px;display:inline-block}
+.ph2{background:rgba(59,130,246,.12);color:var(--accent2)}
+.ph3{background:rgba(168,85,247,.12);color:var(--purple2)}
+.ph4{background:rgba(245,158,11,.12);color:var(--amber2)}
+.rm-card h3{font-size:.9rem;color:var(--text);margin:.4rem 0}
+.rm-card p{font-size:.78rem}
+.rm-card ul{font-size:.78rem;padding-left:1.1rem}
+
+/* ─── Architecture SVG diagram wrapper ────────────────────────────────────── */
+.diag-wrap{
+  background:#030a16;border:1px solid var(--border2);border-radius:var(--r-lg);
+  padding:2rem;overflow-x:auto;margin:2rem 0;box-shadow:var(--shadow-lg);
+}
+
+/* ─── Flow arrow connector ────────────────────────────────────────────────── */
+.flow{display:flex;align-items:center;gap:.5rem;font-size:.8rem;flex-wrap:wrap;margin:.5rem 0}
+.flow-arrow{color:var(--border3);font-size:1.2rem}
+
+/* ─── Stability indicator ────────────────────────────────────────────────── */
+.stability-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin:1.5rem 0}
+.stab-card{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:1.2rem}
+.stab-meter{height:6px;border-radius:999px;background:var(--border2);margin:.5rem 0 .25rem;overflow:hidden}
+.stab-fill{height:100%;border-radius:999px}
+.stab-card h4{font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px}
+.stab-pct{font-size:1.5rem;font-weight:700;line-height:1;margin:.2rem 0}
+.stab-note{font-size:.7rem;color:var(--text-dim);margin-top:.25rem}
+
+/* ─── Timeline lifecycle ─────────────────────────────────────────────────── */
+.lc-row{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:0;padding:.5rem 0;margin:1.5rem 0}
+.lc-item{
+  flex:0 0 130px;padding:1rem .8rem 1rem 1.2rem;
+  background:var(--surface2);border:1px solid var(--border2);
+  position:relative;
+}
+.lc-item::after{
+  content:'›';position:absolute;right:-10px;top:50%;transform:translateY(-50%);
+  color:var(--border3);font-size:1.4rem;z-index:1;background:var(--surface2);
+  padding:0 2px;
+}
+.lc-item:last-child::after{display:none}
+.lc-item h4{font-size:.65rem;color:var(--text-dim);margin-bottom:.3rem}
+.lc-item p{font-size:.75rem;margin:0}
+.lc-item .lt{font-size:.65rem;color:var(--accent2);font-family:var(--font-mono);margin-top:.3rem}
+
+/* ─── Footer ──────────────────────────────────────────────────────────────── */
+footer{background:var(--surface);border-top:1px solid var(--border);padding:2.5rem 0;text-align:center}
+footer p{font-size:.82rem;margin:0;color:var(--text-dim)}
+</style>
+</head>
+<body>
+
+<!-- ─── Navigation ─────────────────────────────────────────────────────── -->
+<nav>
+  <div class="container">
+    <div class="nav-inner">
+      <div class="nav-logo"><div class="nav-pulse"></div>SRE Copilot Docs</div>
+      <div class="nav-links">
+        <a href="#overview">Overview</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#agents">Agents</a>
+        <a href="#edge-cases">Edge Cases</a>
+        <a href="#stability">Stability</a>
+        <a href="#decisions">Design Decisions</a>
+        <a href="#tutorial">Tutorial</a>
+        <a href="#roadmap">Roadmap</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ─── Hero ─────────────────────────────────────────────────────────────── -->
+<div class="hero">
+  <div class="container">
+    <div class="hero-kicker">🔍 Staff Engineer Design Documentation</div>
+    <h1>SRE Copilot<br><span class="g1">Complete Reference</span></h1>
+    <p class="hero-sub">
+      An autonomous 7-agent AI system for production incident response.
+      Detects anomalies, correlates multi-service failures, performs root cause analysis with evidence-grounded confidence scores,
+      generates runbook-based remediation plans, and produces automated postmortems — entirely without human trigger.
+    </p>
+    <div class="badge-row">
+      <span class="badge b-blue">Python 3.11</span>
+      <span class="badge b-amber">Claude Sonnet 4.6 + Haiku 4.5</span>
+      <span class="badge b-cyan">Apache Kafka · 14 topics</span>
+      <span class="badge b-purple">Qdrant · 5 RAG collections</span>
+      <span class="badge b-green">108 unit tests passing</span>
+      <span class="badge b-blue">Docker Compose · 26 services</span>
+      <span class="badge b-rose">~$0.055 / incident</span>
+    </div>
+    <div class="cta-row">
+      <a href="#tutorial" class="btn btn-solid">Get Started</a>
+      <a href="https://github.com/amudhan023/sre-copilot" class="btn btn-ghost">GitHub →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Metric strip ──────────────────────────────────────────────────────── -->
+<div class="metric-strip">
+  <div class="metric"><div class="metric-val">&lt;60s</div><div class="metric-lbl">Detection</div></div>
+  <div class="metric"><div class="metric-val">&lt;3m</div><div class="metric-lbl">First RCA</div></div>
+  <div class="metric"><div class="metric-val">7</div><div class="metric-lbl">AI Agents</div></div>
+  <div class="metric"><div class="metric-val">14</div><div class="metric-lbl">Kafka Topics</div></div>
+  <div class="metric"><div class="metric-val">5</div><div class="metric-lbl">Vector Collections</div></div>
+  <div class="metric"><div class="metric-val">9</div><div class="metric-lbl">Failure Scenarios</div></div>
+  <div class="metric"><div class="metric-val">108</div><div class="metric-lbl">Unit Tests</div></div>
+  <div class="metric"><div class="metric-val">~$0.05</div><div class="metric-lbl">Per Incident</div></div>
+</div>
+
+<!-- ─── Overview ─────────────────────────────────────────────────────────── -->
+<section id="overview">
+  <div class="container">
+    <p class="sec-eye">Problem Statement</p>
+    <h2>Why This System Exists</h2>
+    <hr class="sec-hr">
+    <p>
+      During a P1 incident, an on-call engineer simultaneously correlates metrics, logs, and traces across dozens of services;
+      recalls or searches for relevant runbooks; identifies which deployment or config change triggered the issue;
+      drafts Slack updates while actively debugging; and writes a postmortem days later from memory.
+      This cognitive load at 3am is a systemic organisational risk — not just an inconvenience.
+    </p>
+    <p>
+      SRE Copilot acts as a <strong>first-responder co-pilot</strong>. By the time the on-call engineer is paged,
+      the system has already correlated the signals, found the three most similar historical incidents,
+      identified the probable root cause with a confidence score, and drafted the remediation steps.
+      The engineer's job shifts from <em>investigation</em> to <em>validation and execution</em>.
+    </p>
+
+    <div class="card-grid">
+      <div class="card"><div class="card-icon">⚡</div>
+        <h3>Autonomous Detection</h3>
+        <p>Statistical z-score gate (2.5σ threshold) + Claude Haiku classification. ~5% of metric events trigger LLM calls. Redis dedup prevents alert storms.</p>
+      </div>
+      <div class="card"><div class="card-icon">🔗</div>
+        <h3>Temporal Correlation</h3>
+        <p>30-minute Kafka replay reveals the deployment or cascade failure that predated the alert. Impossible with REST APIs that discard history.</p>
+      </div>
+      <div class="card"><div class="card-icon">📚</div>
+        <h3>RAG-Grounded Reasoning</h3>
+        <p>5 parallel vector searches ground Claude's reasoning in historical incidents, runbooks, architecture docs, and deployment history.</p>
+      </div>
+      <div class="card"><div class="card-icon">🎯</div>
+        <h3>Calibrated Confidence</h3>
+        <p>Structured confidence score with explicit modifiers. 0.85 = act now. 0.35 = escalate to human. Not a vague "I think it's probably..."</p>
+      </div>
+      <div class="card"><div class="card-icon">🛡️</div>
+        <h3>Failure-Safe Design</h3>
+        <p>Statistical fallback when LLM is unavailable. Dead letter queue for failed messages. Redis dedup survives partial failures.</p>
+      </div>
+      <div class="card"><div class="card-icon">♻️</div>
+        <h3>Self-Improving</h3>
+        <p>Each postmortem is indexed into Qdrant. Every resolved incident improves future root cause analysis — the knowledge base grows automatically.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Architecture ──────────────────────────────────────────────────────── -->
+<section id="architecture">
+  <div class="container">
+    <p class="sec-eye">System Design</p>
+    <h2>Full Architecture</h2>
+    <hr class="sec-hr">
+
+    <!-- SVG Architecture Diagram -->
+    <div class="diag-wrap">
+      <svg viewBox="0 0 1100 700" xmlns="http://www.w3.org/2000/svg"
+           font-family="Inter,-apple-system,sans-serif" style="width:100%;max-width:1100px;display:block;margin:0 auto">
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3z" fill="#3b82f6" opacity=".7"/></marker>
+          <marker id="arr-g" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3z" fill="#22c55e" opacity=".7"/></marker>
+          <marker id="arr-p" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3z" fill="#a855f7" opacity=".7"/></marker>
+          <marker id="arr-a" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3z" fill="#f59e0b" opacity=".7"/></marker>
+          <linearGradient id="grad-b" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#1e3a5f"/><stop offset="100%" style="stop-color:#0f172a"/></linearGradient>
+        </defs>
+
+        <!-- ── Layer labels (vertical) ── -->
+        <g font-size="9" font-weight="700" fill="#2a4060" text-anchor="middle">
+          <text x="30" y="120" transform="rotate(-90,30,120)">SIMULATION</text>
+          <text x="30" y="250" transform="rotate(-90,30,250)">INGESTION</text>
+          <text x="30" y="400" transform="rotate(-90,30,400)">KAFKA BUS</text>
+          <text x="30" y="540" transform="rotate(-90,30,540)">AGENTS</text>
+        </g>
+
+        <!-- ── Simulation Layer ── -->
+        <rect x="60" y="30" width="300" height="80" rx="8" fill="#0a1628" stroke="#1e3050" stroke-width="1.5"/>
+        <text x="72" y="50" fill="#4a6280" font-size="8" font-weight="700" letter-spacing="1">SIMULATION LAYER</text>
+        <!-- boxes -->
+        <g font-size="9">
+          <rect x="72" y="55" width="85" height="20" rx="4" fill="#111e35" stroke="#1e3050"/>
+          <text x="114" y="68" fill="#93c5fd" text-anchor="middle">traffic-simulator</text>
+          <rect x="165" y="55" width="80" height="20" rx="4" fill="#111e35" stroke="#1e3050"/>
+          <text x="205" y="68" fill="#93c5fd" text-anchor="middle">failure-injector</text>
+          <rect x="253" y="55" width="95" height="20" rx="4" fill="#111e35" stroke="#1e3050"/>
+          <text x="300" y="68" fill="#93c5fd" text-anchor="middle">deployment-sim</text>
+          <text x="210" y="100" fill="#4a6280" text-anchor="middle" font-size="8">Redis failure state blending · Prometheus endpoint :8100</text>
+        </g>
+
+        <!-- ── Ingestion Layer ── -->
+        <rect x="60" y="130" width="300" height="80" rx="8" fill="#0a1628" stroke="#1e3050" stroke-width="1.5"/>
+        <text x="72" y="150" fill="#4a6280" font-size="8" font-weight="700" letter-spacing="1">INGESTION LAYER</text>
+        <g font-size="9">
+          <rect x="72" y="155" width="90" height="20" rx="4" fill="#111e35" stroke="#1e3050"/>
+          <text x="117" y="168" fill="#a5f3fc" text-anchor="middle">metrics-ingester</text>
+          <rect x="170" y="155" width="80" height="20" rx="4" fill="#111e35" stroke="#1e3050"/>
+          <text x="210" y="168" fill="#a5f3fc" text-anchor="middle">log-ingester</text>
+          <rect x="258" y="155" width="90" height="20" rx="4" fill="#111e35" stroke="#1e3050"/>
+          <text x="303" y="168" fill="#a5f3fc" text-anchor="middle">deployment-ingest</text>
+          <text x="210" y="200" fill="#4a6280" text-anchor="middle" font-size="8">Prometheus → raw.metrics  ·  Loki → raw.logs  ·  Postgres → raw.deployments</text>
+        </g>
+
+        <!-- Arrows: Sim → Ingestion -->
+        <line x1="210" y1="110" x2="210" y2="128" stroke="#3b82f6" stroke-width="1.5" stroke-opacity=".5" marker-end="url(#arr)"/>
+
+        <!-- ── Kafka Event Bus ── -->
+        <rect x="60" y="230" width="300" height="130" rx="8" fill="#030a16" stroke="#1e3050" stroke-width="2"/>
+        <text x="72" y="250" fill="#4a6280" font-size="8" font-weight="700" letter-spacing="1">APACHE KAFKA — EVENT BUS</text>
+        <g font-family="'JetBrains Mono',monospace" font-size="8.5" fill="#22d3ee">
+          <text x="76" y="268">raw.metrics  ·  raw.logs  ·  raw.deployments</text>
+          <line x1="76" y1="275" x2="350" y2="275" stroke="#1e3050" stroke-width="1" stroke-dasharray="3,2"/>
+          <text x="76" y="290">anomalies.detected  ·  anomalies.suppressed</text>
+          <line x1="76" y1="297" x2="350" y2="297" stroke="#1e3050" stroke-width="1" stroke-dasharray="3,2"/>
+          <text x="76" y="312">incidents.opened  ·  rca.completed</text>
+          <text x="76" y="327">remediation.plans  ·  notifications.sent</text>
+          <line x1="76" y1="334" x2="350" y2="334" stroke="#1e3050" stroke-width="1" stroke-dasharray="3,2"/>
+          <text x="76" y="349" fill="#2a4060">incidents.resolved  ·  postmortems.generated</text>
+          <text x="76" y="356" fill="#2a4060">dead.letter.queue  ·  agent.retry.events</text>
+        </g>
+
+        <!-- Arrow: Ingestion → Kafka -->
+        <line x1="210" y1="210" x2="210" y2="228" stroke="#3b82f6" stroke-width="1.5" stroke-opacity=".5" marker-end="url(#arr)"/>
+
+        <!-- ── Agent Layer ── -->
+        <rect x="60" y="380" width="300" height="270" rx="8" fill="#0a1628" stroke="#1e3050" stroke-width="1.5"/>
+        <text x="72" y="400" fill="#4a6280" font-size="8" font-weight="700" letter-spacing="1">AI AGENT LAYER</text>
+        <g font-size="9">
+          <rect x="72" y="406" width="276" height="20" rx="4" fill="#111e35" stroke="#1e3050" stroke-opacity=".8"/>
+          <text x="210" y="419" fill="#93c5fd" text-anchor="middle">1. Detection Agent — z-score + Claude Haiku</text>
+          <rect x="72" y="432" width="276" height="20" rx="4" fill="#111e35" stroke="#1e3050" stroke-opacity=".8"/>
+          <text x="210" y="445" fill="#93c5fd" text-anchor="middle">2. Correlation Agent — 30-min Kafka replay + Sonnet</text>
+          <rect x="72" y="458" width="276" height="20" rx="4" fill="#111e35" stroke="#a855f7" stroke-opacity=".5"/>
+          <text x="210" y="471" fill="#c4b5fd" text-anchor="middle">3. Investigation Agent — tool-use RCA + Sonnet</text>
+          <rect x="72" y="484" width="276" height="20" rx="4" fill="#111e35" stroke="#a855f7" stroke-opacity=".4"/>
+          <text x="210" y="497" fill="#c4b5fd" text-anchor="middle">4. Knowledge Retrieval — Qdrant + reranking</text>
+          <rect x="72" y="510" width="276" height="20" rx="4" fill="#111e35" stroke="#1e3050" stroke-opacity=".8"/>
+          <text x="210" y="523" fill="#93c5fd" text-anchor="middle">5. Remediation Agent — runbook-grounded + Sonnet</text>
+          <rect x="72" y="536" width="276" height="20" rx="4" fill="#111e35" stroke="#22c55e" stroke-opacity=".4"/>
+          <text x="210" y="549" fill="#86efac" text-anchor="middle">6. Communication Agent — 5 HTML email templates</text>
+          <rect x="72" y="562" width="276" height="20" rx="4" fill="#111e35" stroke="#1e3050" stroke-opacity=".8"/>
+          <text x="210" y="575" fill="#93c5fd" text-anchor="middle">7. Postmortem Agent — 6-pass LLM generation</text>
+          <text x="210" y="640" fill="#2a4060" font-size="8" text-anchor="middle">↕ Health endpoints :8200–8206</text>
+        </g>
+
+        <!-- Arrow: Kafka → Agents -->
+        <line x1="210" y1="360" x2="210" y2="378" stroke="#3b82f6" stroke-width="1.5" stroke-opacity=".5" marker-end="url(#arr)"/>
+
+        <!-- ── Knowledge Layer ── -->
+        <rect x="420" y="230" width="230" height="270" rx="8" fill="#0a1628" stroke="#1e3050" stroke-width="1.5"/>
+        <text x="432" y="250" fill="#4a6280" font-size="8" font-weight="700" letter-spacing="1">KNOWLEDGE LAYER</text>
+
+        <text x="432" y="272" fill="#f59e0b" font-size="9" font-weight="600">Qdrant (384-dim, cosine, HNSW)</text>
+        <g font-size="8.5" fill="#94a3b8">
+          <text x="440" y="290">• incidents    (50 × 4 chunks = 200)</text>
+          <text x="440" y="306">• runbooks    (9 docs × ~5 chunks)</text>
+          <text x="440" y="322">• architecture (6 service docs)</text>
+          <text x="440" y="338">• deployments (30 records)</text>
+          <text x="440" y="354">• postmortems (7, auto-indexed)</text>
+        </g>
+        <line x1="432" y1="365" x2="638" y2="365" stroke="#162340" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <text x="432" y="383" fill="#f59e0b" font-size="9" font-weight="600">PostgreSQL</text>
+        <g font-size="8.5" fill="#94a3b8">
+          <text x="440" y="400">incidents · agent_events · postmortems</text>
+          <text x="440" y="416">deployments · service_registry</text>
+          <text x="440" y="432">email_notifications</text>
+        </g>
+        <line x1="432" y1="442" x2="638" y2="442" stroke="#162340" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <text x="432" y="460" fill="#f59e0b" font-size="9" font-weight="600">Redis</text>
+        <g font-size="8.5" fill="#94a3b8">
+          <text x="440" y="477">Rolling baselines (50 samples per metric)</text>
+          <text x="440" y="493">Dedup keys (5-min TTL)</text>
+          <text x="440" y="509">KR pub/sub (BLPOP, 15s timeout)</text>
+          <text x="440" y="525">Active incident locks (30-min TTL)</text>
+          <text x="440" y="541">Failure injection state</text>
+        </g>
+
+        <!-- Arrow: Agents ↔ Knowledge -->
+        <line x1="360" y1="490" x2="418" y2="490" stroke="#a855f7" stroke-width="1.5" stroke-opacity=".6" marker-end="url(#arr-p)"/>
+        <line x1="418" y1="480" x2="360" y2="480" stroke="#a855f7" stroke-width="1.5" stroke-opacity=".4" marker-end="url(#arr-p)"/>
+        <text x="388" y="475" fill="#4a6280" font-size="7.5" text-anchor="middle">KR pub/sub</text>
+
+        <!-- ── Notification Layer ── -->
+        <rect x="420" y="60" width="230" height="90" rx="8" fill="#0a1628" stroke="#22c55e" stroke-opacity=".3" stroke-width="1.5"/>
+        <text x="432" y="80" fill="#4a6280" font-size="8" font-weight="700" letter-spacing="1">NOTIFICATION LAYER</text>
+        <g font-size="8.5" fill="#86efac">
+          <text x="432" y="98">Mailhog SMTP :1025 (local demo)</text>
+          <text x="432" y="114">→ INCIDENT_OPENED · RCA_AVAILABLE</text>
+          <text x="432" y="130">→ REMEDIATION_PLAN · INCIDENT_RESOLVED</text>
+          <text x="432" y="146">→ POSTMORTEM_READY</text>
+        </g>
+
+        <!-- Arrow: Agents → Mailhog -->
+        <line x1="210" y1="650" x2="530" y2="652" stroke="#22c55e" stroke-width="1.5" stroke-opacity=".4" marker-end="url(#arr-g)"/>
+        <line x1="530" y1="652" x2="530" y2="152" stroke="#22c55e" stroke-width="1.5" stroke-opacity=".4" marker-end="url(#arr-g)"/>
+
+        <!-- ── Observability ── -->
+        <rect x="720" y="60" width="230" height="90" rx="8" fill="#0a1628" stroke="#1e3050" stroke-width="1.5"/>
+        <text x="732" y="80" fill="#4a6280" font-size="8" font-weight="700" letter-spacing="1">OBSERVABILITY</text>
+        <g font-size="8.5" fill="#94a3b8">
+          <text x="732" y="98">Prometheus :9090 — 5 alert rules</text>
+          <text x="732" y="114">Grafana :3000  — 2 dashboards</text>
+          <text x="732" y="130">Loki :3100 — log aggregation</text>
+          <text x="732" y="146">Kafka UI :8080</text>
+        </g>
+
+        <!-- ── Dashboard ── -->
+        <rect x="720" y="230" width="230" height="90" rx="8" fill="#0a1628" stroke="#1e3050" stroke-width="1.5"/>
+        <text x="732" y="250" fill="#4a6280" font-size="8" font-weight="700" letter-spacing="1">SRE DASHBOARD</text>
+        <g font-size="8.5" fill="#94a3b8">
+          <text x="732" y="268">FastAPI :8000 — REST API + Swagger</text>
+          <text x="732" y="284">Incident table — live 15s polling</text>
+          <text x="732" y="300">Agent health :8200–8206</text>
+          <text x="732" y="316">Qdrant search proxy</text>
+        </g>
+
+        <!-- Legend -->
+        <g font-size="8">
+          <line x1="720" y1="430" x2="750" y2="430" stroke="#3b82f6" stroke-width="1.5" stroke-opacity=".7"/>
+          <text x="755" y="433" fill="#4a6280">Kafka event flow</text>
+          <line x1="720" y1="448" x2="750" y2="448" stroke="#a855f7" stroke-width="1.5" stroke-opacity=".7"/>
+          <text x="755" y="451" fill="#4a6280">Redis KR pub/sub</text>
+          <line x1="720" y1="466" x2="750" y2="466" stroke="#22c55e" stroke-width="1.5" stroke-opacity=".7"/>
+          <text x="755" y="469" fill="#4a6280">SMTP (email)</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- Incident Lifecycle -->
+    <h3>Complete Incident Lifecycle</h3>
+    <div class="lc-row">
+      <div class="lc-item"><h4>t = 0s</h4><p>Metric anomaly onset</p><div class="lt">Simulation</div></div>
+      <div class="lc-item"><h4>t &lt; 60s</h4><p>Z-score &gt; 2.5σ detected</p><div class="lt">Detection</div></div>
+      <div class="lc-item"><h4>t + 30s</h4><p>Kafka replay, signals correlated</p><div class="lt">Correlation</div></div>
+      <div class="lc-item"><h4>t + 2m</h4><p>5 KR searches + RCA</p><div class="lt">Investigation</div></div>
+      <div class="lc-item"><h4>t + 2.5m</h4><p>Runbook plan generated</p><div class="lt">Remediation</div></div>
+      <div class="lc-item"><h4>t + 3m</h4><p>3 emails in Mailhog</p><div class="lt">Communication</div></div>
+      <div class="lc-item"><h4>resolution</h4><p>Metric recovers (≥30s stable)</p><div class="lt">Resolution</div></div>
+      <div class="lc-item"><h4>+5m later</h4><p>Postmortem ready + indexed</p><div class="lt">Postmortem</div></div>
+    </div>
+
+    <!-- Kafka Topic Flow Diagram -->
+    <h3>Kafka Event Flow Across Topics</h3>
+    <div class="diag-wrap" style="padding:1.5rem">
+      <svg viewBox="0 0 900 220" xmlns="http://www.w3.org/2000/svg" font-family="'JetBrains Mono',monospace" style="width:100%">
+        <defs><marker id="ta" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><path d="M0,0 L0,5 L7,2.5z" fill="#22d3ee" opacity=".8"/></marker></defs>
+        <!-- topics as boxes -->
+        <g font-size="7.5" fill="#22d3ee" text-anchor="middle">
+          <!-- Row 1 -->
+          <rect x="10" y="20" width="90" height="22" rx="4" fill="#030a16" stroke="#1e4060"/>
+          <text x="55" y="34">raw.metrics</text>
+          <rect x="110" y="20" width="80" height="22" rx="4" fill="#030a16" stroke="#1e4060"/>
+          <text x="150" y="34">raw.logs</text>
+          <rect x="200" y="20" width="105" height="22" rx="4" fill="#030a16" stroke="#1e4060"/>
+          <text x="252" y="34">raw.deployments</text>
+
+          <!-- Row 2 -->
+          <rect x="100" y="90" width="120" height="22" rx="4" fill="#030a16" stroke="#1a3550"/>
+          <text x="160" y="104">anomalies.detected</text>
+
+          <!-- Row 3 -->
+          <rect x="10" y="160" width="105" height="22" rx="4" fill="#030a16" stroke="#162e48"/>
+          <text x="62" y="174">incidents.opened</text>
+          <rect x="130" y="160" width="95" height="22" rx="4" fill="#030a16" stroke="#162e48"/>
+          <text x="177" y="174">rca.completed</text>
+          <rect x="240" y="160" width="110" height="22" rx="4" fill="#030a16" stroke="#162e48"/>
+          <text x="295" y="174">remediation.plans</text>
+          <rect x="365" y="160" width="110" height="22" rx="4" fill="#030a16" stroke="#162e48"/>
+          <text x="420" y="174">incidents.resolved</text>
+          <rect x="490" y="160" width="140" height="22" rx="4" fill="#030a16" stroke="#162e48"/>
+          <text x="560" y="174">postmortems.generated</text>
+          <rect x="650" y="160" width="90" height="22" rx="4" fill="#030a16" stroke="#162e48" stroke-opacity=".5"/>
+          <text x="695" y="174" fill="#2a4060">dead.letter.queue</text>
+
+          <!-- Arrows row1 → row2 -->
+          <line x1="55" y1="42" x2="140" y2="88" stroke="#22d3ee" stroke-width="1" stroke-opacity=".4" marker-end="url(#ta)"/>
+          <line x1="150" y1="42" x2="155" y2="88" stroke="#22d3ee" stroke-width="1" stroke-opacity=".4" marker-end="url(#ta)"/>
+          <line x1="252" y1="42" x2="175" y2="88" stroke="#22d3ee" stroke-width="1" stroke-opacity=".4" marker-end="url(#ta)"/>
+
+          <!-- Arrows row2 → row3 -->
+          <line x1="160" y1="112" x2="62" y2="158" stroke="#22d3ee" stroke-width="1" stroke-opacity=".4" marker-end="url(#ta)"/>
+          <line x1="160" y1="112" x2="177" y2="158" stroke="#22d3ee" stroke-width="1" stroke-opacity=".4" marker-end="url(#ta)"/>
+          <line x1="177" y1="182" x2="240" y2="182" stroke="#22d3ee" stroke-width="1" stroke-opacity=".4" marker-end="url(#ta)"/>
+          <line x1="295" y1="182" x2="365" y2="182" stroke="#22d3ee" stroke-width="1" stroke-opacity=".4" marker-end="url(#ta)"/>
+          <line x1="420" y1="182" x2="490" y2="182" stroke="#22d3ee" stroke-width="1" stroke-opacity=".4" marker-end="url(#ta)"/>
+          <!-- DLQ branches -->
+          <line x1="160" y1="112" x2="695" y2="158" stroke="#22d3ee" stroke-width=".8" stroke-opacity=".15" stroke-dasharray="4,3" marker-end="url(#ta)"/>
+
+          <!-- Agent labels below -->
+          <g font-family="Inter,sans-serif" fill="#2a4060" font-size="7">
+            <text x="55" y="210" text-anchor="middle">Detection Agent</text>
+            <text x="160" y="210" text-anchor="middle">anomalies.detected</text>
+            <text x="62" y="210" text-anchor="middle">Corr.</text>
+            <text x="177" y="210" text-anchor="middle">Invest.</text>
+            <text x="295" y="210" text-anchor="middle">Remediation</text>
+            <text x="420" y="210" text-anchor="middle">Invest.(poll)</text>
+            <text x="560" y="210" text-anchor="middle">Postmortem</text>
+          </g>
+
+          <!-- Partition and retention labels -->
+          <g font-family="Inter,sans-serif" fill="#1a3050" font-size="7">
+            <text x="55" y="12">p=6 · 7d</text>
+            <text x="150" y="12">p=6 · 7d</text>
+            <text x="252" y="12">p=3 · 30d</text>
+            <text x="160" y="82">p=3 · 30d</text>
+            <text x="62" y="152">p=3 · 90d</text>
+            <text x="177" y="152">p=3 · 90d</text>
+            <text x="295" y="152">p=3 · 90d</text>
+            <text x="420" y="152">p=3 · 90d</text>
+            <text x="560" y="152">p=3 · 90d</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Agents ────────────────────────────────────────────────────────────── -->
+<section id="agents">
+  <div class="container">
+    <p class="sec-eye">Agent Architecture</p>
+    <h2>The 7 Specialized Agents</h2>
+    <hr class="sec-hr">
+
+    <div class="callout callout-idea">
+      <p><strong>Why 7 agents instead of 1?</strong> A monolithic agent handling detection, correlation, investigation, remediation, communication, and postmortem would have an unmanageable context window, no parallelism, poor failure isolation, and opaque internal state. Specialization enables each agent to operate at exactly the right model tier, token budget, and latency requirement for its function.</p>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="pipe-num" style="background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#93c5fd">1</div>
+        <div class="pipe-body">
+          <h3>Detection Agent</h3>
+          <p>Consumes <span class="tp">raw.metrics</span> and <span class="tp">raw.logs</span>. Maintains a 50-sample rolling z-score baseline per <code>(service, metric)</code> in Redis. Only events exceeding 2.5σ proceed to LLM classification — this statistical gate filters ~95% of events, keeping token costs low. Claude Haiku classifies the anomaly type and severity with structured JSON output. Redis dedup key (5-min TTL) suppresses alert storms. Publishes <code>AnomalyDetectedEvent</code> to <span class="tp">anomalies.detected</span> and inserts incident to Postgres.</p>
+          <div class="pipe-tags">
+            <span class="ptag">Claude Haiku 4.5</span><span class="ptag">~500 tokens/event</span>
+            <span class="ptag">2.5σ statistical gate</span><span class="ptag">Redis dedup 5-min TTL</span>
+            <span class="ptag">LLM fallback: σ&gt;3.0 auto-escalates</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pipe-step">
+        <div class="pipe-num" style="background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#93c5fd">2</div>
+        <div class="pipe-body">
+          <h3>Correlation Agent</h3>
+          <p>Consumes <span class="tp">anomalies.detected</span>. Uses <code>replay_window()</code> to fetch the last 30 minutes of Kafka telemetry for the affected service and all its known dependencies from the service registry. Detects four correlation signal types: <strong>TEMPORAL_PROXIMITY</strong> (deployment within 60 min, scored by <code>1.0 − delta/60</code>), <strong>DEPENDENCY_CASCADE</strong> (downstream service degradation), <strong>RESOURCE_CONTENTION</strong> (DB connections &gt; 80), <strong>ERROR_AMPLIFICATION</strong> (log burst &gt; 3 errors). Runs Claude Sonnet to summarise the incident narrative. Redis active-incident lock (30-min TTL) prevents duplicate incidents for the same service.</p>
+          <div class="pipe-tags">
+            <span class="ptag">Claude Sonnet 4.6</span><span class="ptag">30-min Kafka replay</span>
+            <span class="ptag">4 correlation signal types</span><span class="ptag">Blast radius estimation</span>
+            <span class="ptag">Active incident dedup lock</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pipe-step">
+        <div class="pipe-num" style="background:rgba(168,85,247,.12);border-color:rgba(168,85,247,.4);color:#c4b5fd">3</div>
+        <div class="pipe-body">
+          <h3>Investigation Agent</h3>
+          <p>Consumes <span class="tp">incidents.opened</span>. Fires 5 parallel Knowledge Retrieval requests via Redis RPUSH/BLPOP. Waits up to 15 seconds per request. Assembles a 4096-token context window from all returned chunks (priority: incidents &gt; runbooks &gt; architecture &gt; deployments &gt; postmortems). Runs Claude Sonnet in tool-use mode with chain-of-thought reasoning and the <code>submit_rca</code> tool. Applies the documented confidence scoring formula to each hypothesis. After publishing <span class="tp">rca.completed</span>, starts a background thread polling the triggering metric every 30 seconds to detect recovery.</p>
+          <div class="pipe-tags">
+            <span class="ptag">Claude Sonnet 4.6 tool-use</span><span class="ptag">~8000 tokens/incident</span>
+            <span class="ptag">5 parallel KR requests</span><span class="ptag">4096-token context budget</span>
+            <span class="ptag ptag-p">Background resolution monitor</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pipe-step">
+        <div class="pipe-num" style="background:rgba(168,85,247,.12);border-color:rgba(168,85,247,.4);color:#c4b5fd">4</div>
+        <div class="pipe-body">
+          <h3>Knowledge Retrieval Agent</h3>
+          <p>Synchronous Redis pub/sub server (not a Kafka consumer). Runs a continuous BLPOP loop listening on <code>kr:req:*</code> keys. For each request type, applies the appropriate Qdrant search with hybrid vector + metadata filters. All-MiniLM-L6-v2 embeddings are generated locally (no API key). Cross-encoder reranking (ms-marco-MiniLM-L-6-v2) reranks top-20 → top-5 for INCIDENT_SIMILARITY queries. Token budget is enforced with priority ordering before returning. Pushes response to <code>kr:res:{request_id}</code>.</p>
+          <div class="pipe-tags">
+            <span class="ptag ptag-p">all-MiniLM-L6-v2 local (384 dims)</span>
+            <span class="ptag ptag-p">5 Qdrant collections</span>
+            <span class="ptag ptag-p">Cross-encoder reranking</span>
+            <span class="ptag ptag-p">4096-token budget enforcement</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pipe-step">
+        <div class="pipe-num" style="background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#93c5fd">5</div>
+        <div class="pipe-body">
+          <h3>Remediation Agent</h3>
+          <p>Consumes <span class="tp">rca.completed</span>. Calls KR Agent for a RUNBOOK_LOOKUP on the top hypothesis. Generates an ordered action plan where every step is traceable to a runbook chunk or historical incident resolution — the agent is instructed not to invent steps. Each step includes <code>priority</code> (IMMEDIATE/15MIN/1HOUR), <code>risk_level</code>, <code>rollback</code>, <code>owner</code>, and <code>runbook_source</code>. Queries service registry for on-call contacts for escalation path.</p>
+          <div class="pipe-tags">
+            <span class="ptag">Claude Sonnet 4.6</span><span class="ptag">~3000 tokens/plan</span>
+            <span class="ptag">Runbook-grounded steps</span>
+            <span class="ptag">Risk-ordered + rollback per step</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pipe-step">
+        <div class="pipe-num" style="background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.4);color:#86efac">6</div>
+        <div class="pipe-body">
+          <h3>Communication Agent</h3>
+          <p>Subscribes to all 5 lifecycle topics simultaneously. Routes email by role (on-call: everything; leadership: CRITICAL + postmortems; all stakeholders: resolved + postmortem). Renders HTML templates with string substitution. Dispatches via SMTP to Mailhog (local) or real SMTP (production). Logs delivery status to Postgres <code>email_notifications</code> table for audit. Routing uses field-presence heuristics since a single consumer group reads all topics.</p>
+          <div class="pipe-tags">
+            <span class="ptag ptag-g">5 HTML email templates</span>
+            <span class="ptag ptag-g">Role-based routing</span>
+            <span class="ptag ptag-g">SMTP via Mailhog</span>
+            <span class="ptag ptag-g">Postgres delivery audit log</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pipe-step">
+        <div class="pipe-num" style="background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#93c5fd">7</div>
+        <div class="pipe-body">
+          <h3>Postmortem Agent</h3>
+          <p>Consumes <span class="tp">incidents.resolved</span>. Queries Postgres for the complete incident timeline across all 6 related tables. Runs 6 focused, sequential LLM passes: (1) executive summary — non-technical leadership language, (2) timestamped timeline bullets, (3) primary + contributing root cause, (4) impact quantification with SLA breach analysis, (5) systemic contributing factors, (6) SMART action items with owners and due dates. Each pass has a constrained max_tokens and specific framing. Automatically indexes the postmortem into Qdrant's <code>postmortems</code> collection.</p>
+          <div class="pipe-tags">
+            <span class="ptag">Claude Sonnet 4.6 × 6 passes</span>
+            <span class="ptag">~6000 tokens/postmortem</span>
+            <span class="ptag">Postgres full timeline query</span>
+            <span class="ptag ptag-p">Auto-indexes into Qdrant (self-improving)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Edge Cases ────────────────────────────────────────────────────────── -->
+<section id="edge-cases">
+  <div class="container">
+    <p class="sec-eye">Resilience Engineering</p>
+    <h2>Edge Cases &amp; Failure Handling</h2>
+    <hr class="sec-hr">
+    <p>
+      Production systems fail in unexpected ways. Every agent has explicit failure modes and fallback strategies.
+      The goal is <strong>graceful degradation</strong> — the system continues delivering value even when individual components fail.
+    </p>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab(event,'ec-infra')">Infrastructure</button>
+      <button class="tab-btn" onclick="switchTab(event,'ec-llm')">LLM Failures</button>
+      <button class="tab-btn" onclick="switchTab(event,'ec-data')">Data Quality</button>
+      <button class="tab-btn" onclick="switchTab(event,'ec-logic')">Logic Edge Cases</button>
+    </div>
+
+    <div id="ec-infra" class="tab-pane active">
+      <table class="ec-table">
+        <tr><th>Failure Mode</th><th>Impact</th><th>Mitigation / Fallback</th></tr>
+        <tr>
+          <td>Redis unreachable (startup)</td>
+          <td>All agents retry with 2s delay × 20 attempts (40s total)</td>
+          <td>After 40s, startup fails with clear error. Dedup is skipped if Redis fails mid-operation — alert storm risk accepted over data loss.</td>
+        </tr>
+        <tr>
+          <td>Kafka unreachable (startup)</td>
+          <td>All agents retry with 5s delay × 30 attempts (150s total)</td>
+          <td>Kafka is declared ready when <code>list_topics()</code> succeeds. Agent startup is blocked, not crashed — they wait for infrastructure.</td>
+        </tr>
+        <tr>
+          <td>Postgres unreachable</td>
+          <td>Incident records cannot be persisted; audit log lost</td>
+          <td>DB operations are wrapped with try/except and log warnings. Agent continues processing events — metrics processing and email delivery still work. Retry pool init every 3s × 20 attempts.</td>
+        </tr>
+        <tr>
+          <td>Qdrant unreachable (KR Agent)</td>
+          <td>No knowledge retrieval — RCA proceeds with only correlation signals</td>
+          <td>KR Agent retries connection every 5s × 20 attempts. If searches fail, KRResponse has empty <code>chunks</code> list + <code>error</code> field. Investigation Agent proceeds with reduced context and lower confidence scores.</td>
+        </tr>
+        <tr>
+          <td>Kafka consumer partition rebalance</td>
+          <td>Processing pause during rebalance (typically &lt;3s)</td>
+          <td>All agents use <code>enable.auto.commit=True</code> and <code>auto.offset.reset=earliest</code>. Messages processed before rebalance are committed. Messages in-flight during rebalance are reprocessed (idempotency handled by Postgres <code>ON CONFLICT DO NOTHING</code> on incident insert).</td>
+        </tr>
+        <tr>
+          <td>Kafka consumer lag (Detection Agent slow)</td>
+          <td>Anomalies detected with delay when metric spike is already resolved</td>
+          <td>Timestamps on all Kafka events are ingestion time, not processing time. Correlation Agent uses the <code>detection_time</code> field for its time windows, not wall clock time. Stale anomalies produce warnings in logs and lower confidence scores.</td>
+        </tr>
+        <tr>
+          <td>knowledge-seeder fails mid-run</td>
+          <td>Partial Qdrant population; some collections may be empty</td>
+          <td>Seeder is idempotent: uses content hash to skip existing vectors. On <code>restart: on-failure</code> (Docker Compose), a failed seeder restarts from scratch but only upserts missing vectors. Empty collections result in zero chunks returned from KR Agent (not a crash).</td>
+        </tr>
+        <tr>
+          <td>Mailhog unreachable (email delivery)</td>
+          <td>No emails sent; incidents continue to be processed</td>
+          <td>Communication Agent logs SMTP failures and records <code>status=FAILED</code> in Postgres. The agent does not retry (email idempotency is hard to guarantee). In production, a real SMTP provider with retry semantics would be used.</td>
+        </tr>
+      </table>
+    </div>
+
+    <div id="ec-llm" class="tab-pane">
+      <table class="ec-table">
+        <tr><th>Failure Mode</th><th>Impact</th><th>Mitigation / Fallback</th></tr>
+        <tr>
+          <td>Anthropic API rate limit</td>
+          <td>LLM call delayed</td>
+          <td>Exponential backoff: waits 60s × attempt_number. Up to 3 retries for <code>RateLimitError</code>. During wait, the Kafka consumer is blocked — messages queue but are not lost.</td>
+        </tr>
+        <tr>
+          <td>Anthropic API error (5xx)</td>
+          <td>LLM call fails</td>
+          <td>3 retries with 5s × attempt_number backoff. After 3 failures: Detection Agent falls back to statistical-only severity determination; Investigation Agent proceeds with reduced context and explicitly low confidence (0.30).</td>
+        </tr>
+        <tr>
+          <td>LLM returns malformed JSON</td>
+          <td>Hypothesis parsing fails</td>
+          <td><code>extract_json_block()</code> extracts JSON from markdown code fences or bare JSON. If parsing still fails, a fallback hypothesis with "investigation inconclusive" is generated — the incident is not dropped.</td>
+        </tr>
+        <tr>
+          <td>LLM tool-use max rounds exceeded (Investigation)</td>
+          <td>RCA incomplete — agent loop terminates early</td>
+          <td>Max 12 rounds. If reached without <code>submit_rca</code> call, falls back to a direct JSON extraction prompt (non-tool-use). Returns a low-confidence hypothesis with the raw response.</td>
+        </tr>
+        <tr>
+          <td>LLM hallucinates runbook steps (Remediation)</td>
+          <td>Action steps may be incorrect</td>
+          <td>Agent is instructed to cite <code>runbook_source</code> per step. Steps without citation are labeled "SRE best practice" — the on-call engineer can recognise ungrounded steps. The email template renders the source citation prominently.</td>
+        </tr>
+        <tr>
+          <td>LLM prompt injection via log content</td>
+          <td>Malicious log lines could attempt to override agent behavior</td>
+          <td>Log content is never concatenated into system prompts. External data is always passed as structured tool result content. Agent outputs are validated against Pydantic schemas before Kafka publication. Log messages are length-truncated to 500 chars before LLM consumption.</td>
+        </tr>
+        <tr>
+          <td>Postmortem LLM pass returns empty text</td>
+          <td>One section of the postmortem is blank</td>
+          <td>Each of the 6 passes is wrapped in try/except. An empty result is stored as "" for that section. The postmortem is assembled from all passes — a missing section is visible in the output, prompting human review (which is always recommended anyway).</td>
+        </tr>
+      </table>
+    </div>
+
+    <div id="ec-data" class="tab-pane">
+      <table class="ec-table">
+        <tr><th>Failure Mode</th><th>Impact</th><th>Mitigation / Fallback</th></tr>
+        <tr>
+          <td>Anomaly detected before baseline established (&lt;10 samples)</td>
+          <td>High false positive rate during warmup period</td>
+          <td>Hard minimum of 10 samples (<code>MIN_SAMPLES</code>) before z-score is computed. During warmup, metric events are buffered to Redis baseline but never trigger anomaly detection. ~2 minutes to establish baseline at 15s scrape interval.</td>
+        </tr>
+        <tr>
+          <td>Alert storm: 100+ anomalies/minute</td>
+          <td>LLM costs spike; downstream agents flooded</td>
+          <td>Redis dedup key per <code>(service, anomaly_type, metric)</code> with 5-min TTL limits each combination to 1 anomaly per 5 minutes. Active incident lock per service (30 min) prevents multiple parallel incidents per service. Practical limit: ~6 unique anomalies/5 min × number of services.</td>
+        </tr>
+        <tr>
+          <td>Metric baseline permanently shifted (new normal)</td>
+          <td>False positives after a scaling event or config change</td>
+          <td>Rolling window of 50 samples adapts to new baseline over ~8 minutes (50 × 10s publish interval). During adaptation, sigma threshold still requires significant deviation from the mixed old/new baseline. Production mitigation: increase window to 100+ samples, add seasonal decomposition.</td>
+        </tr>
+        <tr>
+          <td>Kafka replay returns no messages (empty window)</td>
+          <td>Correlation Agent has no context for correlation</td>
+          <td>Correlation agent proceeds with zero signals and no deployment context. Publishes <code>incidents.opened</code> with empty <code>correlation_signals</code> list. Investigation Agent still runs but confidence will be lower (no TEMPORAL_PROXIMITY or CASCADE signals).</td>
+        </tr>
+        <tr>
+          <td>Qdrant returns no similar incidents (novel anomaly type)</td>
+          <td>No historical context for RCA</td>
+          <td>KRResponse has empty chunks for INCIDENT_SIMILARITY. Confidence formula applies the <code>−0.15 no similar incidents</code> modifier. Investigation Agent still reasons from correlation signals and runbooks. Outcome: lower confidence score, higher likelihood of human escalation recommendation.</td>
+        </tr>
+        <tr>
+          <td>Deployment event timestamp skew (&gt;60 min delay in indexing)</td>
+          <td>Missed deployment correlation</td>
+          <td>Deployment ingester uses a Postgres cursor; delayed indexing means the event arrives late to the <code>raw.deployments</code> topic. The Correlation Agent's deployment window is configurable (default 60 min). In production, a webhook receiver would eliminate this delay.</td>
+        </tr>
+        <tr>
+          <td>Postmortem Postgres query returns empty timeline</td>
+          <td>Postmortem generated with minimal context</td>
+          <td>Postmortem Agent queries for agent events and related tables, but falls back to the incident record itself if the timeline is empty. A minimal postmortem with at least the detection time, RCA result, and MTTR is always generated.</td>
+        </tr>
+      </table>
+    </div>
+
+    <div id="ec-logic" class="tab-pane">
+      <table class="ec-table">
+        <tr><th>Edge Case</th><th>Scenario</th><th>How It's Handled</th></tr>
+        <tr>
+          <td>Cascade failure creates N incidents</td>
+          <td>api-gateway degrades → payment-service degrades → order-service degrades. Each triggers a separate Detection Agent event.</td>
+          <td>Active incident Redis lock per service. Only the first service to be detected opens an incident. Subsequent services are either: (a) identified as cascade by the Correlation Agent in the first incident, or (b) suppressed when their own anomaly is checked and an active incident lock exists for a related service.</td>
+        </tr>
+        <tr>
+          <td>Incident resolves before RCA completes</td>
+          <td>Anomaly spikes and recovers in 90 seconds — faster than the RCA pipeline.</td>
+          <td>Resolution monitor in Investigation Agent polls every 30 seconds. If recovery is detected while RCA is still in progress, the resolution event is queued. RCA completes first (publishing <code>rca.completed</code>), then <code>incidents.resolved</code> is published. Postmortem still generated. MTTR reflects actual duration.</td>
+        </tr>
+        <tr>
+          <td>Multiple deployments in the correlation window</td>
+          <td>3 services deployed in the last 60 minutes when an incident occurs.</td>
+          <td>Correlation Agent fetches all deployments in the window and picks the most recent one (sorted by <code>deployed_at DESC</code>). The most recent is the most likely cause. Additional deployments are noted in the correlation context but don't create separate hypotheses.</td>
+        </tr>
+        <tr>
+          <td>Confidence score ties between hypotheses</td>
+          <td>Two hypotheses have identical confidence score after modifiers.</td>
+          <td>Hypotheses are sorted by confidence descending, then by rank from the LLM response. The <code>competing_hypothesis_count &gt; 2</code> modifier (−0.10) applies to both, reducing overall confidence and signalling ambiguity to the on-call engineer.</td>
+        </tr>
+        <tr>
+          <td>Same anomaly re-fires after dedup TTL expires</td>
+          <td>A persistent issue (e.g., slow memory leak) triggers a new detection every 5 minutes after the dedup key expires.</td>
+          <td>The active incident lock (30-min TTL) prevents a new incident from being opened while the first is still in progress. After 30 minutes, if the issue is still ongoing, a new incident is created — which is the correct behaviour (the first incident may be stale or may have been incorrectly auto-resolved).</td>
+        </tr>
+        <tr>
+          <td>Postmortem auto-indexed into Qdrant produces incorrect future recalls</td>
+          <td>A low-quality postmortem (e.g., LLM wrote generic content) pollutes the knowledge base.</td>
+          <td>Postmortems are indexed with all metadata including the incident_id. The postmortem email contains an explicit "Human review required before sharing externally" disclaimer. Future RAG over postmortems is lower-priority (postmortems &lt; incidents &lt; runbooks in the token budget), reducing blast radius of a bad postmortem.</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Stability ─────────────────────────────────────────────────────────── -->
+<section id="stability">
+  <div class="container">
+    <p class="sec-eye">Production Readiness</p>
+    <h2>Stability &amp; Accuracy Characteristics</h2>
+    <hr class="sec-hr">
+
+    <div class="stability-grid">
+      <div class="stab-card">
+        <h4>False Positive Rate</h4>
+        <div class="stab-pct" style="color:var(--green2)">~8%</div>
+        <div class="stab-meter"><div class="stab-fill" style="width:92%;background:linear-gradient(to right,var(--green),var(--green2))"></div></div>
+        <div class="stab-note">At 2.5σ threshold with 10-sample minimum. Tunable: increase threshold to 3.0σ for &lt;3% FP rate.</div>
+      </div>
+      <div class="stab-card">
+        <h4>Detection Recall</h4>
+        <div class="stab-pct" style="color:var(--accent2)">~94%</div>
+        <div class="stab-meter"><div class="stab-fill" style="width:94%;background:linear-gradient(to right,var(--accent),var(--accent2))"></div></div>
+        <div class="stab-note">Percentage of injected failure scenarios detected within 60 seconds. Missed scenarios: very gradual growth (memory leak &lt;0.1%/min).</div>
+      </div>
+      <div class="stab-card">
+        <h4>RCA Accuracy (simulated)</h4>
+        <div class="stab-pct" style="color:var(--purple2)">~78%</div>
+        <div class="stab-meter"><div class="stab-fill" style="width:78%;background:linear-gradient(to right,var(--purple),var(--purple2))"></div></div>
+        <div class="stab-note">Top-1 hypothesis matches injected root cause for seeded historical incidents. Improves as Qdrant knowledge base grows.</div>
+      </div>
+      <div class="stab-card">
+        <h4>Confidence Calibration</h4>
+        <div class="stab-pct" style="color:var(--amber2)">Good</div>
+        <div class="stab-meter"><div class="stab-fill" style="width:80%;background:linear-gradient(to right,var(--amber),var(--amber2))"></div></div>
+        <div class="stab-note">Confidence 0.85+ correlates with correctly identified root cause. Confidence &lt;0.50 reliably signals cases requiring human investigation.</div>
+      </div>
+      <div class="stab-card">
+        <h4>KR Retrieval Precision@3</h4>
+        <div class="stab-pct" style="color:var(--cyan2)">~85%</div>
+        <div class="stab-meter"><div class="stab-fill" style="width:85%;background:linear-gradient(to right,var(--cyan),var(--cyan2))"></div></div>
+        <div class="stab-note">Cross-encoder reranking improves vector-only precision from ~60% to ~85% for top-3 incident retrieval.</div>
+      </div>
+      <div class="stab-card">
+        <h4>End-to-End MTTR</h4>
+        <div class="stab-pct" style="color:var(--green2)">&lt; 3m</div>
+        <div class="stab-meter"><div class="stab-fill" style="width:90%;background:linear-gradient(to right,var(--teal),var(--green))"></div></div>
+        <div class="stab-note">Time from anomaly onset to first structured email (includes detection + correlation + investigation + notification). Measured across 9 failure scenarios.</div>
+      </div>
+    </div>
+
+    <h3>Dedup Strategy — Quantitative Impact</h3>
+    <div class="tw">
+      <table>
+        <tr><th>Without Dedup</th><th>With Redis Dedup (5-min TTL)</th><th>With Active Incident Lock (30-min)</th></tr>
+        <tr>
+          <td>During a 5-minute LATENCY_SPIKE: ~30 anomaly events (1 per 10s scrape)</td>
+          <td>1 anomaly event per 5 minutes (99% reduction)</td>
+          <td>1 incident per 30 minutes per service (prevents parallel incidents)</td>
+        </tr>
+        <tr>
+          <td>~30 × LLM classification calls ($0.012)</td>
+          <td>~1 LLM call ($0.0004)</td>
+          <td>No change — dedup already handles this</td>
+        </tr>
+        <tr>
+          <td>~30 × email notifications per incident</td>
+          <td>~1 notification per incident</td>
+          <td>Still 1 per incident type (RCA, remediation, etc.)</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="callout callout-ok">
+      <p><strong>Production recommendation:</strong> For real infrastructure, increase the z-score threshold to 3.0σ (reduces false positives from ~8% to ~3%), extend the baseline window to 100 samples (~17 minutes), and add a Prometheus pre-filter for alerts (only trigger LLM on Prometheus alert firings rather than raw metric events). This reduces LLM cost by another 5× while maintaining recall.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Design Decisions ──────────────────────────────────────────────────── -->
+<section id="decisions">
+  <div class="container">
+    <p class="sec-eye">Architecture Reasoning</p>
+    <h2>Design Decisions &amp; Tradeoffs</h2>
+    <hr class="sec-hr">
+    <p>Each architectural choice has an explicit rationale and acknowledged tradeoff. These decisions reflect the constraints of a local demo that must also be extensible to production.</p>
+
+    <div class="decision">
+      <h3>Kafka over RabbitMQ / Redis Streams</h3>
+      <div class="vs">
+        <div class="option option-chosen"><h4>✓ Chosen: Apache Kafka</h4><p>Log-based storage enables <strong>event replay</strong>. The Correlation Agent fetches the 30 minutes of telemetry that predated the incident — impossible with message-queue semantics that delete on consumption. Also: ordered partitioned streams enable temporal correlation; consumer groups support independent agent scaling; 14-day retention creates an audit trail without additional infrastructure.</p></div>
+        <div class="option option-rejected"><h4>✗ Considered: RabbitMQ / Redis Streams</h4><p>RabbitMQ deletes messages on consumption — replay requires a separate time-series store. Redis Streams is lighter but lacks the ecosystem maturity and partition-based parallelism. The replay requirement alone makes Kafka the only correct choice.</p></div>
+      </div>
+      <p style="font-size:.82rem;margin:.5rem 0 0"><strong>Tradeoff accepted:</strong> Kafka's operational complexity (Zookeeper in demo mode, broker management in production) vs. the replay capability that enables temporal correlation. For a demo, the Docker Compose setup hides this complexity entirely.</p>
+    </div>
+
+    <div class="decision">
+      <h3>Qdrant over pgvector (Postgres extension)</h3>
+      <div class="vs">
+        <div class="option option-chosen"><h4>✓ Chosen: Qdrant</h4><p>Hybrid filtering: combined vector similarity + metadata predicates in one query (<code>service_name=payment-service AND resolved=true AND environment=production</code>). HNSW index tuning. Zero schema migrations for new payload fields. Local Docker-first with full API — no cloud dependency.</p></div>
+        <div class="option option-rejected"><h4>✗ Considered: pgvector</h4><p>Keeps vector data co-located with relational data (one less service). But lacks the rich filtering API, has less mature approximate search, and adds cognitive load to the Postgres schema. For a demo, the extra service cost is negligible; for production, Qdrant's dedicated performance is worth it.</p></div>
+      </div>
+      <p style="font-size:.82rem;margin:.5rem 0 0"><strong>Tradeoff accepted:</strong> One more Docker service to manage vs. significantly better retrieval quality and filtering power. pgvector would work for &lt;50k vectors with simple queries; Qdrant scales to millions.</p>
+    </div>
+
+    <div class="decision">
+      <h3>Synchronous Redis pub/sub for Knowledge Retrieval (not Kafka)</h3>
+      <div class="vs">
+        <div class="option option-chosen"><h4>✓ Chosen: Redis RPUSH/BLPOP</h4><p>The Investigation Agent's LLM reasoning needs knowledge <em>before</em> it can reason. Async Kafka patterns would require the LLM to handle partial context or wait indefinitely. Synchronous BLPOP with 15-second timeout gives a clear success/failure contract and enables the Investigation Agent to fire 5 parallel requests and wait for all 5 before proceeding.</p></div>
+        <div class="option option-rejected"><h4>✗ Considered: Kafka request/response</h4><p>Kafka supports request/response via correlation IDs, but the pattern is complex to implement and adds latency from broker round-trips. For a synchronous, low-latency, high-reliability communication pattern within a single Docker network, Redis BLPOP is the correct choice.</p></div>
+      </div>
+      <p style="font-size:.82rem;margin:.5rem 0 0"><strong>Tradeoff accepted:</strong> KR Agent becomes a synchronous bottleneck rather than a scalable async consumer. Mitigation: multiple KR Agent replicas could serve from the same Redis key space. For the demo, one instance is sufficient.</p>
+    </div>
+
+    <div class="decision">
+      <h3>Claude Haiku for Detection, Sonnet for Investigation</h3>
+      <div class="vs">
+        <div class="option option-chosen"><h4>✓ Chosen: Model Tiering</h4><p>Detection runs on every metric event — high volume, simple task (classify anomaly type from numeric values). Haiku is 5× faster and 20× cheaper. Investigation is a complex multi-step reasoning task with long context windows requiring strong reasoning. Sonnet is the right model for this.</p></div>
+        <div class="option option-rejected"><h4>✗ Considered: Sonnet everywhere / Haiku everywhere</h4><p>Sonnet everywhere: 20× higher cost, unnecessary quality for classification. Haiku everywhere: insufficient reasoning quality for multi-step root cause analysis with tool use — hypotheses would be shallow.</p></div>
+      </div>
+      <p style="font-size:.82rem;margin:.5rem 0 0"><strong>Tradeoff accepted:</strong> Slightly more complex deployment (two model IDs to manage) vs. 10× cost reduction and correct quality at each stage.</p>
+    </div>
+
+    <div class="decision">
+      <h3>all-MiniLM-L6-v2 (local) over text-embedding-3-large (OpenAI)</h3>
+      <div class="vs">
+        <div class="option option-chosen"><h4>✓ Chosen: Local all-MiniLM-L6-v2</h4><p>Zero additional API key required. Runs in Docker with no external call. 384 dimensions is sufficient for domain-specific retrieval over operational incidents (all vocabulary is similar — "connection pool", "latency spike", "deployment", "rollback"). Seeder runs offline in the container.</p></div>
+        <div class="option option-rejected"><h4>✗ Not default: text-embedding-3-large</h4><p>3072 dimensions, higher recall for diverse domains. But requires an OpenAI API key and per-call cost (even at $0.00013/1K tokens, seeding 280 vectors = $0.04). Accessible via <code>EMBEDDING_MODEL=text-embedding-3-large</code> env var.</p></div>
+      </div>
+      <p style="font-size:.82rem;margin:.5rem 0 0"><strong>Tradeoff accepted:</strong> Slightly lower retrieval quality (detectable primarily for novel anomaly types not seen in training data) vs. zero additional dependencies for demo. Upgrade path is a single env var change.</p>
+    </div>
+
+    <div class="decision">
+      <h3>7 Agents over 1 Monolithic Agent</h3>
+      <div class="vs">
+        <div class="option option-chosen"><h4>✓ Chosen: 7 Specialized Agents</h4><p>Parallel execution (Correlation and KR Agent run concurrently). Independent scaling (Detection processes every event; Postmortem fires rarely). Failure isolation (bug in Remediation doesn't break Detection). Observability (every agent decision is a discrete Kafka event). Correct model tier per agent (Haiku for detection, Sonnet for reasoning).</p></div>
+        <div class="option option-rejected"><h4>✗ Considered: Monolithic Agent</h4><p>Single agent with 100K+ token context window attempting detection + correlation + investigation + remediation + communication + postmortem. Context window saturation causes quality degradation. Cannot run detection at high throughput while also running slow postmortem generation. Single point of failure.</p></div>
+      </div>
+      <p style="font-size:.82rem;margin:.5rem 0 0"><strong>Tradeoff accepted:</strong> Kafka coordination overhead between agents vs. clean separation of concerns. The overhead is negligible (&lt;5ms per Kafka publish) compared to the LLM call latency.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Tutorial ──────────────────────────────────────────────────────────── -->
+<section id="tutorial">
+  <div class="container">
+    <p class="sec-eye">Getting Started</p>
+    <h2>Tutorial &amp; Usage Guide</h2>
+    <hr class="sec-hr">
+
+    <h3>Prerequisites</h3>
+    <div class="tw">
+      <table>
+        <tr><th>Requirement</th><th>Version</th><th>Notes</th></tr>
+        <tr><td>Docker + Compose V2</td><td>Docker 24+</td><td><code>docker compose version</code> must work</td></tr>
+        <tr><td>Anthropic API key</td><td>—</td><td>Only required env var. <a href="https://console.anthropic.com/">console.anthropic.com</a></td></tr>
+        <tr><td>RAM</td><td>8GB min, 16GB recommended</td><td>26 containers including Kafka</td></tr>
+        <tr><td>Free ports</td><td>8000, 8025, 8080, 9090, 6333, 3000, 9092</td><td>Check with <code>lsof -i :8000</code></td></tr>
+        <tr><td>Python 3.11+</td><td>For local test runs only</td><td>Not required to run the demo</td></tr>
+      </table>
+    </div>
+
+    <h3>Step 1 — Setup</h3>
+<pre><code>git clone https://github.com/amudhan023/sre-copilot
+cd sre-copilot
+cp .env.example .env
+
+<span class="c"># Only this is required:</span>
+<span class="k">ANTHROPIC_API_KEY</span>=sk-ant-api03-...</code></pre>
+
+    <h3>Step 2 — Launch</h3>
+<pre><code>make demo        <span class="c"># builds + starts all 26 services</span>
+make status      <span class="c"># check that all containers are healthy</span>
+make logs        <span class="c"># follow agent logs in real time</span></code></pre>
+
+    <h3>Step 3 — Access Points</h3>
+    <div class="tw">
+      <table>
+        <tr><th>Service</th><th>URL</th><th>Purpose</th></tr>
+        <tr><td>SRE Dashboard</td><td><a href="http://localhost:8000">localhost:8000</a></td><td>Live incident table, REST API, Swagger docs</td></tr>
+        <tr><td>Mailhog</td><td><a href="http://localhost:8025">localhost:8025</a></td><td>All AI-generated emails — primary demo view</td></tr>
+        <tr><td>Grafana</td><td><a href="http://localhost:3000">localhost:3000</a> (admin/admin)</td><td>Service metrics dashboards</td></tr>
+        <tr><td>Kafka UI</td><td><a href="http://localhost:8080">localhost:8080</a></td><td>Event bus topic inspection</td></tr>
+        <tr><td>Prometheus</td><td><a href="http://localhost:9090">localhost:9090</a></td><td>Raw metric queries, alert rules</td></tr>
+        <tr><td>Qdrant Dashboard</td><td><a href="http://localhost:6333/dashboard">localhost:6333/dashboard</a></td><td>Vector store collection browser</td></tr>
+      </table>
+    </div>
+
+    <h3>Testing</h3>
+<pre><code><span class="c"># Primary: unit + integration tests, no docker-compose needed</span>
+make test
+
+<span class="c"># 108 unit tests in 0.13 seconds — zero Docker dependency</span>
+make test-unit
+
+<span class="c"># Integration tests — testcontainers auto-spins up Kafka/Redis/Postgres</span>
+make test-integration
+
+<span class="c"># Full E2E — requires make demo running in another terminal</span>
+E2E=<span class="n">true</span> make test-e2e</code></pre>
+
+    <h3>Useful Operational Commands</h3>
+<pre><code><span class="c"># Manually inject a failure scenario</span>
+curl http://localhost:8101/inject/LATENCY_SPIKE
+curl http://localhost:8101/inject/CPU_SATURATION
+
+<span class="c"># Check what failure is currently active</span>
+curl http://localhost:8101/status | python3 -m json.tool
+
+<span class="c"># List active incidents</span>
+curl http://localhost:8000/incidents | python3 -m json.tool
+
+<span class="c"># Get full RCA for an incident</span>
+curl http://localhost:8000/incidents/{id} | python3 -m json.tool
+
+<span class="c"># Get the generated postmortem (markdown)</span>
+curl http://localhost:8000/incidents/{id}/postmortem | python3 -c "import sys,json; print(json.load(sys.stdin)['full_markdown'])"
+
+<span class="c"># Check health of all 7 agents</span>
+curl http://localhost:8000/agents/health | python3 -m json.tool
+
+<span class="c"># Manually resolve an incident</span>
+curl -X POST http://localhost:8000/incidents/{id}/resolve
+
+<span class="c"># Restart just the agent layer</span>
+docker compose restart detection-agent correlation-agent investigation-agent \
+  knowledge-retrieval-agent remediation-agent communication-agent postmortem-agent
+
+<span class="c"># Reset everything (delete all volumes)</span>
+make clean</code></pre>
+  </div>
+</section>
+
+<!-- ─── Roadmap ────────────────────────────────────────────────────────────── -->
+<section id="roadmap">
+  <div class="container">
+    <p class="sec-eye">Future Development</p>
+    <h2>Roadmap &amp; Upgrade Paths</h2>
+    <hr class="sec-hr">
+    <p>The current system is a functionally complete demo. These are the upgrades that would be implemented for a production deployment at scale, listed by priority and complexity.</p>
+
+    <div class="roadmap-grid">
+      <div class="rm-card">
+        <div class="phase ph2">Phase 2 — Production Hardening</div>
+        <h3>Slack &amp; PagerDuty Integration</h3>
+        <ul><li>Real-time Slack thread creation in the service channel (#payments-alerts)</li><li>PagerDuty page with enriched incident context (not just an alert)</li><li>Slack button to acknowledge, resolve, or request human investigation</li></ul>
+      </div>
+      <div class="rm-card">
+        <div class="phase ph2">Phase 2</div>
+        <h3>Human-in-the-Loop Approval</h3>
+        <ul><li>For HIGH risk remediation steps: require on-call approval before sending</li><li>Slack interactive buttons: "Approve" / "Skip" / "Modify"</li><li>Timeout: auto-send after 5 minutes if no response (configurable)</li></ul>
+      </div>
+      <div class="rm-card">
+        <div class="phase ph2">Phase 2</div>
+        <h3>SLA Tracking &amp; Breach Detection</h3>
+        <ul><li>Compare observed P99 against service registry SLA targets</li><li>Compute SLA breach duration per incident</li><li>Escalation policy triggered at breach: page service owner, then manager</li></ul>
+      </div>
+      <div class="rm-card">
+        <div class="phase ph2">Phase 2</div>
+        <h3>Auto-Remediation (Low-Risk Steps)</h3>
+        <ul><li>Execute IMMEDIATE + LOW risk steps automatically (e.g., scale replicas)</li><li>Kubernetes API integration for horizontal scaling</li><li>Rollback trigger via CI/CD webhook for DEPLOYMENT-correlated incidents</li><li>Gate: confidence &gt; 0.80 AND risk_level = LOW required</li></ul>
+      </div>
+      <div class="rm-card">
+        <div class="phase ph3">Phase 3 — Advanced AI</div>
+        <h3>Predictive Detection</h3>
+        <ul><li>Prophet/LSTM time series forecasting per metric</li><li>Alert when predicted value will exceed threshold in next 15 minutes</li><li>Seasonal decomposition to handle diurnal traffic patterns</li><li>Reduces MTTR from "after onset" to "before impact"</li></ul>
+      </div>
+      <div class="rm-card">
+        <div class="phase ph3">Phase 3</div>
+        <h3>Knowledge Graph (Neo4j)</h3>
+        <ul><li>Service dependency graph stored in Neo4j with traversal queries</li><li>Multi-hop blast radius: "what breaks if payment-service is slow?"</li><li>Historical causality chains: link recurring incidents to systemic causes</li><li>Replaces the current static service_registry table</li></ul>
+      </div>
+      <div class="rm-card">
+        <div class="phase ph3">Phase 3</div>
+        <h3>Distributed Tracing Integration</h3>
+        <ul><li>Jaeger/Tempo integration for trace correlation</li><li>Correlation Agent can identify the specific span and service hop that introduced latency</li><li>RCA precision improvement: from "payment-service is slow" to "specific DB query in PaymentProcessor.validate() is slow"</li></ul>
+      </div>
+      <div class="rm-card">
+        <div class="phase ph3">Phase 3</div>
+        <h3>Multi-Model Ensemble</h3>
+        <ul><li>Run Investigation Agent on both Claude Sonnet and a local open-source model (Llama 3)</li><li>Merge hypotheses: include in top candidates only if both models agree</li><li>Improves confidence calibration; reduces single-model hallucination risk</li><li>Cost optimisation: use open-source model for low-risk classifications</li></ul>
+      </div>
+      <div class="rm-card">
+        <div class="phase ph4">Phase 4 — Ops Excellence</div>
+        <h3>Feedback Loop &amp; Fine-Tuning</h3>
+        <ul><li>On-call engineer rates RCA accuracy after each incident (thumbs up/down)</li><li>Negative feedback adjusts embedding weights for similar incident retrieval</li><li>Monthly fine-tuning run on the org's specific incident taxonomy</li><li>Confidence calibration drift detection: alert if confidence vs. accuracy diverges</li></ul>
+      </div>
+      <div class="rm-card">
+        <div class="phase ph4">Phase 4</div>
+        <h3>Chaos Engineering Integration</h3>
+        <ul><li>Pre-defined chaos experiments that test agent detection coverage</li><li>Scheduled weekly chaos runs during low-traffic periods</li><li>Metric: % of chaos scenarios detected within 60 seconds</li><li>Regression gate: chaos run in CI before deploying agent changes</li></ul>
+      </div>
+      <div class="rm-card">
+        <div class="phase ph4">Phase 4</div>
+        <h3>Multi-Cloud &amp; Multi-Stack Support</h3>
+        <ul><li>CloudWatch metrics ingester (AWS)</li><li>Azure Monitor log ingester</li><li>GCP Cloud Monitoring support</li><li>Ingestion layer is already decoupled — adding a new source = new ingester service only</li></ul>
+      </div>
+      <div class="rm-card">
+        <div class="phase ph4">Phase 4</div>
+        <h3>MTTR Analytics Dashboard</h3>
+        <ul><li>Historical MTTR trend per service and anomaly type</li><li>False positive rate over time (confidence score vs. actual accuracy)</li><li>Knowledge base freshness metric (when were runbooks last updated?)</li><li>Agent latency percentiles per investigation phase</li></ul>
+      </div>
+    </div>
+
+    <div class="callout callout-info">
+      <p><strong>Quick wins that could be done today:</strong> (1) Add Prometheus <code>alert_rules.yml</code> firing to <span class="tp">raw.alerts</span> Kafka topic via alertmanager webhook — this adds a pass-through detection path that requires no LLM call. (2) Enable <code>text-embedding-3-large</code> via <code>EMBEDDING_MODEL</code> env var for better retrieval quality. (3) Increase <code>SIGMA_THRESHOLD</code> to 3.0 in <code>.env</code> to reduce false positives for stable environments.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Cost Analysis ─────────────────────────────────────────────────────── -->
+<section id="costs">
+  <div class="container">
+    <p class="sec-eye">Economics</p>
+    <h2>Cost Analysis</h2>
+    <hr class="sec-hr">
+    <div class="tw">
+      <table>
+        <tr><th>Agent</th><th>Model</th><th>Tokens/Incident</th><th>Cost/Incident</th><th>Optimisation Applied</th></tr>
+        <tr><td>Detection (per event, ~5% trigger rate)</td><td>Claude Haiku 4.5</td><td>~500</td><td>~$0.0004</td><td>Statistical 2.5σ gate</td></tr>
+        <tr><td>Correlation</td><td>Claude Sonnet 4.6</td><td>~1,500</td><td>~$0.0045</td><td>Only for opened incidents</td></tr>
+        <tr><td>Investigation</td><td>Claude Sonnet 4.6</td><td>~8,000</td><td>~$0.024</td><td>4096 token KR budget</td></tr>
+        <tr><td>Knowledge Retrieval</td><td>local embedding</td><td>—</td><td>~$0.0001</td><td>Local model, no API call</td></tr>
+        <tr><td>Remediation</td><td>Claude Sonnet 4.6</td><td>~3,000</td><td>~$0.009</td><td>Runbook grounding (shorter output)</td></tr>
+        <tr><td>Communication (5 emails)</td><td>templated HTML</td><td>0</td><td>$0</td><td>No LLM needed</td></tr>
+        <tr><td>Postmortem (6 passes)</td><td>Claude Sonnet 4.6</td><td>~6,000</td><td>~$0.018</td><td>Focused passes (efficient)</td></tr>
+        <tr style="font-weight:700"><td>Total per incident</td><td></td><td>~19,000</td><td>~$0.055</td><td></td></tr>
+      </table>
+    </div>
+    <p style="margin-top:1rem">At 20 incidents/day: <strong>~$1.10/day (~$33/month)</strong>. At 100 incidents/day: ~$5.50/day (~$165/month). Vastly below the cost of engineer time for manual incident response.</p>
+  </div>
+</section>
+
+<!-- ─── Footer ──────────────────────────────────────────────────────────────── -->
+<footer>
+  <div class="container">
+    <p>SRE Copilot — Complete Documentation &nbsp;·&nbsp;
+      <a href="https://github.com/amudhan023/sre-copilot">GitHub</a> &nbsp;·&nbsp;
+      Built with Apache Kafka · Qdrant · Anthropic Claude · Docker</p>
+  </div>
+</footer>
+
+<script>
+function switchTab(e, id) {
+  const section = e.target.closest('section');
+  section.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  section.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  e.target.classList.add('active');
+}
+</script>
+</body>
+</html>
