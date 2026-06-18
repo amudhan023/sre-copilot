@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Incident Resolved</title>
+<style>
+body{font-family:Arial,sans-serif;margin:0;background:#f5f5f5}
+.container{max-width:680px;margin:20px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.header{background:#16a34a;padding:24px 32px;color:#fff}
+.header h1{margin:0;font-size:20px}
+.body{padding:32px}
+.metric-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:20px 0}
+.metric{background:#f0fdf4;border-radius:8px;padding:16px;text-align:center}
+.metric-value{font-size:24px;font-weight:700;color:#16a34a}
+.metric-label{font-size:11px;color:#6b7280;text-transform:uppercase;margin-top:4px}
+.section{margin:24px 0}
+.section h3{font-size:13px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;padding-bottom:8px}
+p{font-size:14px;color:#374151;line-height:1.6}
+.footer{background:#f9fafb;padding:16px 32px;font-size:12px;color:#9ca3af;text-align:center}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>✅ Incident Resolved — {{incident_id_short}}</h1>
+    <p style="margin:6px 0 0;opacity:.85;font-size:14px">{{service}} is back to normal</p>
+  </div>
+  <div class="body">
+    <div class="metric-grid">
+      <div class="metric"><div class="metric-value">{{mttr}}</div><div class="metric-label">MTTR (minutes)</div></div>
+      <div class="metric"><div class="metric-value">{{severity}}</div><div class="metric-label">Severity</div></div>
+      <div class="metric"><div class="metric-value">{{anomaly_type}}</div><div class="metric-label">Anomaly Type</div></div>
+    </div>
+
+    <div class="section">
+      <h3>Resolution Summary</h3>
+      <p>The incident on <strong>{{service}}</strong> has been resolved. Service metrics have returned to normal baseline levels.</p>
+      <p><strong>Root Cause:</strong> {{top_root_cause}}</p>
+      <p><strong>Resolution Method:</strong> {{resolution_method}}</p>
+    </div>
+
+    <div class="section">
+      <h3>Timeline</h3>
+      <p>
+        <strong>Detected:</strong> {{detection_time}}<br>
+        <strong>Resolved:</strong> {{resolved_at}}<br>
+        <strong>Total Duration:</strong> {{mttr}} minutes
+      </p>
+    </div>
+
+    <p style="font-size:13px;color:#6b7280;border-top:1px solid #e5e7eb;padding-top:16px;margin-top:24px">
+      A postmortem will be automatically generated within 5 minutes.
+    </p>
+  </div>
+  <div class="footer">SRE Copilot — Automated Incident Response &nbsp;|&nbsp; {{generated_at}}</div>
+</div>
+</body>
+</html>

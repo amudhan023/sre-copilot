@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Incident Alert</title>
+<style>
+body{font-family:Arial,sans-serif;margin:0;background:#f5f5f5}
+.container{max-width:680px;margin:20px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.header{background:#dc2626;padding:24px 32px;color:#fff}
+.header h1{margin:0;font-size:20px;font-weight:700}
+.header .badge{display:inline-block;background:rgba(255,255,255,.2);padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;margin-top:6px}
+.body{padding:32px}
+.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}
+.meta-item{background:#f9fafb;border-radius:6px;padding:12px}
+.meta-item label{display:block;font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;margin-bottom:4px}
+.meta-item value{font-size:14px;font-weight:600;color:#111}
+.section{margin:24px 0}
+.section h3{font-size:13px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px}
+ul{margin:8px 0;padding-left:20px}
+li{margin:4px 0;font-size:14px;color:#374151}
+.status-bar{background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:12px 16px;font-size:13px;color:#92400e;margin:16px 0}
+.footer{background:#f9fafb;padding:16px 32px;font-size:12px;color:#9ca3af;text-align:center}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🚨 INCIDENT ALERT — {{anomaly_type}} on {{service}}</h1>
+    <div class="badge">{{severity}}</div>
+  </div>
+  <div class="body">
+    <div class="meta-grid">
+      <div class="meta-item"><label>Incident ID</label><value>{{incident_id_short}}</value></div>
+      <div class="meta-item"><label>Service</label><value>{{service}}</value></div>
+      <div class="meta-item"><label>Detected At</label><value>{{detection_time}}</value></div>
+      <div class="meta-item"><label>Anomaly Type</label><value>{{anomaly_type}}</value></div>
+    </div>
+
+    <div class="section">
+      <h3>Description</h3>
+      <p style="font-size:14px;color:#374151;line-height:1.6">{{description}}</p>
+    </div>
+
+    <div class="section">
+      <h3>Observed Anomaly</h3>
+      <ul>
+        <li>Metric: <strong>{{trigger_metric}}</strong></li>
+        <li>Observed value: <strong>{{observed_value}}</strong></li>
+        <li>Baseline: <strong>{{baseline_value}}</strong></li>
+        <li>Deviation: <strong>{{deviation_sigma}}σ</strong></li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h3>Blast Radius (Estimated)</h3>
+      <ul>
+        <li>Affected services: <strong>{{affected_services}}</strong></li>
+        <li>User impact: <strong>{{user_impact}}</strong></li>
+        <li>Revenue impact: <strong>{{revenue_impact}}</strong></li>
+      </ul>
+    </div>
+
+    <div class="status-bar">
+      AI investigation has been automatically initiated. Root cause analysis in progress.
+    </div>
+  </div>
+  <div class="footer">SRE Copilot — Automated Incident Response &nbsp;|&nbsp; {{generated_at}}</div>
+</div>
+</body>
+</html>

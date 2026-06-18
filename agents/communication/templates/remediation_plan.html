@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Remediation Plan</title>
+<style>
+body{font-family:Arial,sans-serif;margin:0;background:#f5f5f5}
+.container{max-width:680px;margin:20px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.header{background:#7c3aed;padding:24px 32px;color:#fff}
+.header h1{margin:0;font-size:20px}
+.body{padding:32px}
+.step{border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:12px 0}
+.step.immediate{border-left:4px solid #dc2626}
+.step.within15{border-left:4px solid #f59e0b}
+.step.within1h{border-left:4px solid #3b82f6}
+.step-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.step-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;background:#374151;flex-shrink:0}
+.step-title{font-weight:600;font-size:14px;color:#111}
+.priority-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;text-transform:uppercase}
+.priority-IMMEDIATE{background:#fee2e2;color:#dc2626}
+.priority-WITHIN_15MIN{background:#fef3c7;color:#d97706}
+.priority-WITHIN_1HOUR{background:#dbeafe;color:#2563eb}
+.risk-badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px}
+.risk-LOW{background:#d1fae5;color:#065f46}
+.risk-MEDIUM{background:#fef3c7;color:#92400e}
+.risk-HIGH{background:#fee2e2;color:#991b1b}
+.step-detail{font-size:13px;color:#374151;margin:4px 0}
+.step-detail strong{color:#111}
+.escalation{background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:14px;margin:20px 0}
+.footer{background:#f9fafb;padding:16px 32px;font-size:12px;color:#9ca3af;text-align:center}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🛠️ Remediation Plan — {{incident_id_short}}</h1>
+    <p style="margin:6px 0 0;opacity:.85;font-size:14px">Root cause: {{top_root_cause}} &nbsp;|&nbsp; Est. {{estimated_time}}</p>
+  </div>
+  <div class="body">
+    {{steps_html}}
+
+    <div class="escalation">
+      <strong style="font-size:13px">Escalation Path:</strong>
+      <p style="margin:6px 0 0;font-size:13px;color:#374151">{{escalation_path}}</p>
+      <p style="margin:6px 0 0;font-size:12px;color:#6b7280">If steps 1–2 do not resolve within 15 minutes, escalate immediately.</p>
+    </div>
+
+    {{runbook_refs_html}}
+  </div>
+  <div class="footer">SRE Copilot — Automated Incident Response &nbsp;|&nbsp; {{generated_at}}</div>
+</div>
+</body>
+</html>

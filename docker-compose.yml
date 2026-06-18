@@ -1,0 +1,491 @@
+version: "3.9"
+
+# ─── Shared environment fragment ─────────────────────────────────────────────
+x-common-env: &common-env
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  POSTGRES_HOST:     postgres
+  POSTGRES_PORT:     "5432"
+  POSTGRES_DB:       sre_copilot
+  POSTGRES_USER:     sre_user
+  POSTGRES_PASSWORD: sre_password
+  REDIS_HOST:        redis
+  REDIS_PORT:        "6379"
+  QDRANT_URL:        http://qdrant:6333
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+  PROMETHEUS_URL:    http://prometheus:9090
+  LOKI_URL:          http://loki:3100
+  SMTP_HOST:         mailhog
+  SMTP_PORT:         "1025"
+  EMBEDDING_MODEL:   all-MiniLM-L6-v2
+
+x-agent-build: &agent-build
+  context: .
+
+services:
+
+  # ─── Infrastructure ──────────────────────────────────────────────────────────
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 6
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: sre-copilot
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB:       sre_copilot
+      POSTGRES_USER:     sre_user
+      POSTGRES_PASSWORD: sre_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sre_user -d sre_copilot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./infrastructure/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+
+  loki:
+    image: grafana/loki:2.9.0
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "8025:8025"   # Web UI
+      - "1025:1025"   # SMTP
+
+  # ─── Init jobs ────────────────────────────────────────────────────────────────
+
+  knowledge-seeder:
+    build:
+      context: .
+      dockerfile: knowledge/seeder/Dockerfile
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+    restart: on-failure
+
+  # ─── Simulation ───────────────────────────────────────────────────────────────
+
+  traffic-simulator:
+    build:
+      context: .
+      dockerfile: simulation/traffic-simulator/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8100:8100"
+    environment:
+      <<: *common-env
+      METRICS_PORT: "8100"
+      INITIAL_QUIET_PERIOD_SECONDS: "30"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8100/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  failure-injector:
+    build:
+      context: .
+      dockerfile: simulation/failure-injector/Dockerfile
+    depends_on:
+      traffic-simulator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8101:8101"
+    environment:
+      <<: *common-env
+      HTTP_PORT: "8101"
+      INITIAL_QUIET_PERIOD_SECONDS: "120"
+      FAILURE_GAP_MIN_SECONDS: "300"
+      FAILURE_GAP_MAX_SECONDS: "600"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8101/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  deployment-simulator:
+    build:
+      context: .
+      dockerfile: simulation/deployment-simulator/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8102:8102"
+    environment:
+      <<: *common-env
+      HTTP_PORT: "8102"
+      INITIAL_QUIET_PERIOD_SECONDS: "90"
+      DEPLOY_INTERVAL_MIN_SECONDS: "900"
+      DEPLOY_INTERVAL_MAX_SECONDS: "1800"
+
+  # ─── Ingestion ────────────────────────────────────────────────────────────────
+
+  metrics-ingester:
+    build:
+      context: .
+      dockerfile: ingestion/metrics-ingester/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      HTTP_PORT: "8110"
+      SCRAPE_INTERVAL_SECONDS: "15"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8110/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  log-ingester:
+    build:
+      context: .
+      dockerfile: ingestion/log-ingester/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      HTTP_PORT: "8111"
+      POLL_INTERVAL_SECONDS: "5"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8111/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  deployment-ingester:
+    build:
+      context: .
+      dockerfile: ingestion/deployment-ingester/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      HTTP_PORT: "8112"
+      POLL_INTERVAL_SECONDS: "10"
+
+  # ─── Agents ───────────────────────────────────────────────────────────────────
+
+  detection-agent:
+    build:
+      context: .
+      dockerfile: agents/detection/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8200:8200"
+    environment:
+      <<: *common-env
+      HTTP_PORT: "8200"
+      SIGMA_THRESHOLD: "2.5"
+      DEDUP_TTL_SECONDS: "300"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8200/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  correlation-agent:
+    build:
+      context: .
+      dockerfile: agents/correlation/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8201:8201"
+    environment:
+      <<: *common-env
+      HTTP_PORT: "8201"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8201/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  investigation-agent:
+    build:
+      context: .
+      dockerfile: agents/investigation/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8202:8202"
+    environment:
+      <<: *common-env
+      HTTP_PORT: "8202"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8202/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  knowledge-retrieval-agent:
+    build:
+      context: .
+      dockerfile: agents/knowledge-retrieval/Dockerfile
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      knowledge-seeder:
+        condition: service_completed_successfully
+    ports:
+      - "8203:8203"
+    environment:
+      <<: *common-env
+      HTTP_PORT: "8203"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8203/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  remediation-agent:
+    build:
+      context: .
+      dockerfile: agents/remediation/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8204:8204"
+    environment:
+      <<: *common-env
+      HTTP_PORT: "8204"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8204/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  communication-agent:
+    build:
+      context: .
+      dockerfile: agents/communication/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    ports:
+      - "8205:8205"
+    environment:
+      <<: *common-env
+      HTTP_PORT: "8205"
+      EMAIL_FROM: sre-copilot@company.com
+      ONCALL_EMAIL: oncall@company.com
+      TEAM_EMAIL: sre-team@company.com
+      MANAGEMENT_EMAIL: engineering-management@company.com
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8205/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  postmortem-agent:
+    build:
+      context: .
+      dockerfile: agents/postmortem/Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8206:8206"
+    environment:
+      <<: *common-env
+      HTTP_PORT: "8206"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8206/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  # ─── Application ──────────────────────────────────────────────────────────────
+
+  sre-api:
+    build:
+      context: .
+      dockerfile: application/sre-api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *common-env
+      DETECTION_AGENT_URL:    http://detection-agent:8200
+      CORRELATION_AGENT_URL:  http://correlation-agent:8201
+      INVESTIGATION_AGENT_URL: http://investigation-agent:8202
+      KR_AGENT_URL:           http://knowledge-retrieval-agent:8203
+      REMEDIATION_AGENT_URL:  http://remediation-agent:8204
+      COMMUNICATION_AGENT_URL: http://communication-agent:8205
+      POSTMORTEM_AGENT_URL:   http://postmortem-agent:8206
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  grafana_data:

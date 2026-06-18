@@ -1,0 +1,138 @@
+{
+  "services": [
+    {
+      "service_name": "api-gateway",
+      "description": "Central API gateway that handles all inbound HTTP traffic. Routes requests to downstream services based on path. Handles authentication, rate limiting, and request tracing. Built in Go.",
+      "tech_stack": ["Go", "nginx", "Redis (rate limiting)"],
+      "criticality": "P0",
+      "team_owner": "platform-team",
+      "on_call_rotation": "platform-oncall@company.com",
+      "slack_channel": "#platform-alerts",
+      "sla_p99_latency_ms": 200,
+      "sla_error_rate_pct": 0.5,
+      "upstream_services": [],
+      "downstream_services": ["payment-service", "order-service", "user-service"],
+      "deployment_frequency": "multiple_per_day",
+      "typical_rps": 150,
+      "database": "none",
+      "key_metrics": ["http_request_duration_seconds", "http_requests_total", "service_cpu_percent"],
+      "known_failure_modes": [
+        "Rate limiter misconfiguration causes legitimate traffic to be blocked",
+        "Upstream timeout settings too aggressive cause premature failures",
+        "Memory leak in connection pooling under sustained high load"
+      ]
+    },
+    {
+      "service_name": "payment-service",
+      "description": "Processes all payment transactions. Integrates with external payment processors. Handles refunds, chargebacks, and payment status webhooks. Writes transaction records to PostgreSQL. Strict consistency requirements — all operations are transactional. Built in Java/Spring.",
+      "tech_stack": ["Java", "Spring Boot", "PostgreSQL", "Redis"],
+      "criticality": "P0",
+      "team_owner": "payments-team",
+      "on_call_rotation": "payments-oncall@company.com",
+      "slack_channel": "#payments-alerts",
+      "sla_p99_latency_ms": 500,
+      "sla_error_rate_pct": 0.1,
+      "upstream_services": ["api-gateway"],
+      "downstream_services": ["postgres", "redis"],
+      "deployment_frequency": "weekly",
+      "typical_rps": 50,
+      "database": "postgres (primary writer)",
+      "key_metrics": ["service_latency_p99_ms", "service_error_rate_percent", "db_connections_active", "payments_processed_total"],
+      "known_failure_modes": [
+        "DB connection pool exhaustion under high transaction volume",
+        "External payment processor timeouts cause latency spikes",
+        "Redis cache miss storms after restart cause DB overload",
+        "JVM GC pauses at high memory utilization"
+      ]
+    },
+    {
+      "service_name": "order-service",
+      "description": "Manages the full order lifecycle: creation, validation, fulfillment, and cancellation. Orchestrates calls to payment-service and inventory-service. Publishes order events to Kafka for downstream consumers (notification-service). Built in Python/FastAPI.",
+      "tech_stack": ["Python", "FastAPI", "PostgreSQL", "Kafka", "Redis"],
+      "criticality": "P0",
+      "team_owner": "commerce-team",
+      "on_call_rotation": "commerce-oncall@company.com",
+      "slack_channel": "#commerce-alerts",
+      "sla_p99_latency_ms": 400,
+      "sla_error_rate_pct": 0.5,
+      "upstream_services": ["api-gateway"],
+      "downstream_services": ["payment-service", "inventory-service", "kafka", "notification-service"],
+      "deployment_frequency": "daily",
+      "typical_rps": 80,
+      "database": "postgres (primary writer)",
+      "key_metrics": ["service_latency_p99_ms", "service_error_rate_percent", "orders_processed_total", "kafka_consumer_lag"],
+      "known_failure_modes": [
+        "Cascade failure when payment-service is slow — order-service holds DB transactions open waiting",
+        "Kafka consumer lag accumulates during high order volumes",
+        "Inventory service timeouts cause order validation to fail",
+        "Synchronous payment call blocks thread pool under load"
+      ]
+    },
+    {
+      "service_name": "user-service",
+      "description": "Manages user accounts, profiles, authentication tokens, and preferences. Serves as the identity source of truth. High read rate (every authenticated request touches this service). Redis-cached for performance. Built in Node.js.",
+      "tech_stack": ["Node.js", "Express", "PostgreSQL", "Redis"],
+      "criticality": "P1",
+      "team_owner": "identity-team",
+      "on_call_rotation": "identity-oncall@company.com",
+      "slack_channel": "#identity-alerts",
+      "sla_p99_latency_ms": 300,
+      "sla_error_rate_pct": 0.5,
+      "upstream_services": ["api-gateway"],
+      "downstream_services": ["postgres", "redis"],
+      "deployment_frequency": "weekly",
+      "typical_rps": 200,
+      "database": "postgres (primary reader, light writes)",
+      "key_metrics": ["service_latency_p99_ms", "service_error_rate_percent", "redis_commands_total"],
+      "known_failure_modes": [
+        "Redis cache eviction on restart causes DB read storm",
+        "JWT token validation memory leak under sustained load",
+        "Node.js event loop blocking on synchronous crypto operations"
+      ]
+    },
+    {
+      "service_name": "notification-service",
+      "description": "Consumes order events from Kafka and sends email/SMS/push notifications to users. Stateless beyond Kafka consumer state. Does not write to any database. Built in Python.",
+      "tech_stack": ["Python", "Kafka consumer", "SMTP", "Redis"],
+      "criticality": "P1",
+      "team_owner": "platform-team",
+      "on_call_rotation": "platform-oncall@company.com",
+      "slack_channel": "#platform-alerts",
+      "sla_p99_latency_ms": 1000,
+      "sla_error_rate_pct": 1.0,
+      "upstream_services": ["order-service"],
+      "downstream_services": ["kafka"],
+      "deployment_frequency": "weekly",
+      "typical_rps": 30,
+      "database": "none",
+      "key_metrics": ["kafka_consumer_lag", "service_memory_percent", "service_error_rate_percent"],
+      "known_failure_modes": [
+        "Memory leak in email template rendering under high notification volume",
+        "Kafka consumer lag accumulates when SMTP provider is slow",
+        "Consumer group rebalance during deployment causes message replay"
+      ]
+    },
+    {
+      "service_name": "inventory-service",
+      "description": "Manages product inventory levels, reservations, and stock adjustments. Called synchronously by order-service during order validation. High consistency requirements for stock counts. Built in Go.",
+      "tech_stack": ["Go", "PostgreSQL"],
+      "criticality": "P1",
+      "team_owner": "commerce-team",
+      "on_call_rotation": "commerce-oncall@company.com",
+      "slack_channel": "#commerce-alerts",
+      "sla_p99_latency_ms": 400,
+      "sla_error_rate_pct": 1.0,
+      "upstream_services": ["order-service"],
+      "downstream_services": ["postgres"],
+      "deployment_frequency": "weekly",
+      "typical_rps": 40,
+      "database": "postgres (primary writer, row-level locking)",
+      "key_metrics": ["service_latency_p99_ms", "service_error_rate_percent", "db_connections_active"],
+      "known_failure_modes": [
+        "Row-level lock contention during flash sales causes severe latency spikes",
+        "DB connection pool exhaustion during order burst",
+        "Cascade from postgres slowness affecting all write operations"
+      ]
+    }
+  ]
+}

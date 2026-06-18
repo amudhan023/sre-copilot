@@ -1,0 +1,20 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "unit: fast tests with no Docker dependencies",
+    "integration: tests requiring real Kafka/Redis/Postgres containers",
+    "e2e: full stack tests (requires docker compose up and E2E=true)",
+    "contract: schema and API contract tests",
+]
+# By default, exclude e2e tests (require live stack)
+addopts = "-v --tb=short -p no:warnings --ignore=tests/e2e"
+# Override with: pytest tests/e2e -m e2e (after setting E2E=true)
+
+[tool.coverage.run]
+source = ["agents", "shared", "ingestion", "simulation", "knowledge"]
+omit = ["*/test*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false

@@ -1,0 +1,48 @@
+groups:
+  - name: sre_copilot_alerts
+    interval: 15s
+    rules:
+      - alert: HighLatencyP99
+        expr: service_latency_p99_ms > 2000
+        for: 1m
+        labels:
+          severity: high
+        annotations:
+          summary: "High P99 latency on {{ $labels.service }}"
+          description: "P99 latency {{ $value }}ms exceeds 2000ms threshold"
+
+      - alert: HighErrorRate
+        expr: service_error_rate_percent > 5
+        for: 1m
+        labels:
+          severity: high
+        annotations:
+          summary: "High error rate on {{ $labels.service }}"
+          description: "Error rate {{ $value }}% exceeds 5% threshold"
+
+      - alert: CPUSaturation
+        expr: service_cpu_percent > 85
+        for: 2m
+        labels:
+          severity: high
+        annotations:
+          summary: "CPU saturation on {{ $labels.service }}"
+          description: "CPU at {{ $value }}% for >2 minutes"
+
+      - alert: MemoryPressure
+        expr: service_memory_percent > 80
+        for: 2m
+        labels:
+          severity: high
+        annotations:
+          summary: "Memory pressure on {{ $labels.service }}"
+          description: "Memory at {{ $value }}% for >2 minutes"
+
+      - alert: KafkaConsumerLag
+        expr: kafka_consumer_lag > 10000
+        for: 1m
+        labels:
+          severity: high
+        annotations:
+          summary: "Kafka consumer lag on {{ $labels.service }}"
+          description: "Consumer lag {{ $value }} messages"
