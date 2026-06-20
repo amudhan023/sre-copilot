@@ -1,0 +1,2139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SRE Copilot — Architecture & Execution Flow</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#050d1f;--surface:#0a1628;--s2:#0f1e35;--s3:#162a42;--s4:#1e3350;
+  --border:#162340;--b2:#1e3050;--b3:#2a4060;
+  --blue:#3b82f6;--blue2:#60a5fa;--blue3:#93c5fd;
+  --green:#22c55e;--green2:#4ade80;
+  --red:#ef4444;--red2:#f87171;
+  --amber:#f59e0b;--amber2:#fbbf24;
+  --purple:#a855f7;--purple2:#c084fc;
+  --cyan:#06b6d4;--cyan2:#22d3ee;
+  --rose:#f43f5e;--rose2:#fb7185;
+  --teal:#14b8a6;--teal2:#2dd4bf;
+  --orange:#f97316;--orange2:#fb923c;
+  --violet:#8b5cf6;--violet2:#a78bfa;
+  --indigo:#6366f1;--indigo2:#818cf8;
+  --yellow:#eab308;--yellow2:#facc15;
+  --text:#e2e8f0;--muted:#94a3b8;--dim:#4a6280;
+  --mono:'JetBrains Mono','Fira Code',monospace;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --r:10px;--rl:16px;
+}
+html{scroll-behavior:smooth;font-size:16px}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden}
+
+h1{font-size:clamp(2rem,4vw,3.5rem);font-weight:800;letter-spacing:-1.5px;line-height:1.1}
+h2{font-size:clamp(1.4rem,2.5vw,1.9rem);font-weight:700;letter-spacing:-.5px;margin-bottom:1rem}
+h3{font-size:1.05rem;font-weight:600;color:var(--blue2);margin-bottom:.5rem}
+h4{font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:.4rem}
+p{color:var(--muted);margin-bottom:.85rem;line-height:1.75}
+p:last-child{margin-bottom:0}
+a{color:var(--blue2);text-decoration:none}
+a:hover{color:#fff}
+strong,b{color:var(--text)}
+code{font-family:var(--mono);font-size:.8em;background:rgba(59,130,246,.1);padding:.1rem .35rem;border-radius:4px;color:var(--blue3)}
+ul,ol{padding-left:1.4rem;color:var(--muted)}
+li{margin-bottom:.3rem}
+li strong{color:var(--text)}
+
+.container{max-width:1280px;margin:0 auto;padding:0 2rem}
+section{padding:4rem 0;border-bottom:1px solid var(--border)}
+section:last-child{border-bottom:none}
+
+/* Nav */
+nav{position:sticky;top:0;z-index:100;background:rgba(5,13,31,.93);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;padding:.7rem 0}
+.nav-brand{display:flex;align-items:center;gap:.5rem;font-weight:700;font-size:.95rem}
+.dot{width:7px;height:7px;background:var(--green);border-radius:50%;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.4)}}
+.nav-links{display:flex;gap:1.2rem;flex-wrap:wrap}
+.nav-links a{font-size:.75rem;color:var(--dim);transition:color .15s;white-space:nowrap}
+.nav-links a:hover{color:var(--text)}
+@media(max-width:900px){.nav-links{display:none}}
+
+/* Hero */
+.hero{padding:5rem 0 3.5rem;background:radial-gradient(ellipse 80% 50% at 50% -5%,rgba(59,130,246,.13) 0%,transparent 65%),radial-gradient(ellipse 40% 30% at 80% 90%,rgba(168,85,247,.07) 0%,transparent 60%);border-bottom:1px solid var(--border)}
+.badge{display:inline-flex;align-items:center;gap:.4rem;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);color:var(--blue2);padding:.25rem .9rem;border-radius:999px;font-size:.72rem;font-weight:600;letter-spacing:.5px;margin-bottom:1.3rem}
+.hero h1 .g{background:linear-gradient(135deg,#60a5fa,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:1rem;max-width:680px;margin:1rem 0 2rem;line-height:1.8}
+.stat-row{display:flex;flex-wrap:wrap;gap:1.5rem;margin-top:2rem}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.4rem}
+.stat-val{font-size:1.6rem;font-weight:800;line-height:1}
+.stat-label{font-size:.7rem;color:var(--muted);margin-top:.25rem;text-transform:uppercase;letter-spacing:.5px}
+
+/* Section headings */
+.section-tag{display:inline-block;font-size:.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:.2rem .7rem;border-radius:999px;margin-bottom:.7rem}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:1.5rem;margin-bottom:1rem}
+.card-grid{display:grid;gap:1rem}
+.card-grid-2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.card-grid-3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+
+/* Agent cards */
+.agent-card{background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);padding:1.2rem;border-left:3px solid var(--blue)}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:.83rem;margin:1rem 0}
+th{background:var(--s3);color:var(--muted);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:.6rem .9rem;text-align:left;border-bottom:1px solid var(--b2)}
+td{padding:.55rem .9rem;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:top}
+td strong{color:var(--text)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+
+/* SVG diagrams */
+.diagram{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:1.5rem;overflow-x:auto;margin:1.5rem 0}
+.diagram svg{display:block;max-width:100%;height:auto}
+.diagram-caption{font-size:.75rem;color:var(--dim);text-align:center;margin-top:.8rem}
+
+/* Code blocks */
+.code-block{background:#02091a;border:1px solid var(--b2);border-radius:var(--r);padding:1.2rem 1.5rem;font-family:var(--mono);font-size:.78rem;line-height:1.9;color:#c9d1d9;overflow-x:auto;margin:1rem 0}
+.code-block .k{color:#ff7b72}
+.code-block .s{color:#a5d6ff}
+.code-block .c{color:#48545e;font-style:italic}
+.code-block .f{color:#d2a8ff}
+.code-block .n{color:#79c0ff}
+.code-block .o{color:#ffa657}
+
+/* Formula */
+.formula{background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);padding:1.2rem 1.5rem;font-family:var(--mono);font-size:.82rem;line-height:2;margin:1rem 0}
+.formula .base{color:var(--yellow2);font-weight:700}
+.formula .pos{color:var(--green2)}
+.formula .neg{color:var(--red2)}
+.formula .rule{color:var(--muted)}
+
+/* Tags */
+.tag{display:inline-block;font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:4px;text-transform:uppercase;letter-spacing:.5px}
+.tag-critical{background:rgba(239,68,68,.15);color:var(--red2);border:1px solid rgba(239,68,68,.3)}
+.tag-high{background:rgba(249,115,22,.15);color:var(--orange2);border:1px solid rgba(249,115,22,.3)}
+.tag-medium{background:rgba(234,179,8,.15);color:var(--yellow2);border:1px solid rgba(234,179,8,.3)}
+.tag-low{background:rgba(34,197,94,.15);color:var(--green2);border:1px solid rgba(34,197,94,.3)}
+.tag-p0{background:rgba(239,68,68,.15);color:var(--red2);border:1px solid rgba(239,68,68,.3)}
+.tag-p1{background:rgba(234,179,8,.15);color:var(--yellow2);border:1px solid rgba(234,179,8,.3)}
+
+/* Timeline */
+.timeline{position:relative;padding-left:2rem;margin:1.5rem 0}
+.timeline::before{content:'';position:absolute;left:.4rem;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,var(--blue),var(--purple))}
+.timeline-item{position:relative;margin-bottom:1.5rem}
+.timeline-item::before{content:'';position:absolute;left:-1.65rem;top:.45rem;width:10px;height:10px;border-radius:50%;background:var(--blue);border:2px solid var(--bg)}
+.timeline-time{font-size:.7rem;color:var(--blue2);font-family:var(--mono);font-weight:700;margin-bottom:.2rem}
+.timeline-title{font-weight:600;color:var(--text);font-size:.9rem;margin-bottom:.2rem}
+.timeline-desc{font-size:.82rem;color:var(--muted)}
+
+/* Confidence bar */
+.conf-bar{height:8px;border-radius:4px;background:linear-gradient(to right,var(--red),var(--amber),var(--green));position:relative;margin:.8rem 0}
+.conf-marker{position:absolute;top:-4px;width:2px;height:16px;background:#fff;border-radius:1px}
+.conf-label{font-size:.7rem;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:.2rem}
+
+/* Grid layouts */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:2rem}
+@media(max-width:860px){.two-col{grid-template-columns:1fr}}
+.three-col{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+@media(max-width:860px){.three-col{grid-template-columns:1fr}}
+
+/* Port badge */
+.port{font-family:var(--mono);font-size:.7rem;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);color:var(--blue3);padding:.1rem .4rem;border-radius:4px}
+
+/* Accordion */
+details{background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);margin-bottom:.6rem}
+summary{padding:.9rem 1.2rem;cursor:pointer;font-weight:600;font-size:.9rem;list-style:none;display:flex;align-items:center;gap:.5rem}
+summary::before{content:'▶';font-size:.6rem;color:var(--muted);transition:transform .2s}
+details[open] summary::before{transform:rotate(90deg)}
+details[open] .details-body{padding:0 1.2rem 1.2rem}
+
+/* Step list */
+.step-list{counter-reset:step;list-style:none;padding:0}
+.step-list li{counter-increment:step;padding:.6rem 0 .6rem 2.5rem;position:relative;border-bottom:1px solid var(--border);color:var(--muted);font-size:.87rem}
+.step-list li:last-child{border-bottom:none}
+.step-list li::before{content:counter(step);position:absolute;left:0;top:.6rem;width:1.6rem;height:1.6rem;background:var(--blue);color:#fff;border-radius:50%;font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center}
+
+/* Layer pills for diagrams */
+.layer-pill{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .8rem;border-radius:999px;font-size:.72rem;font-weight:700;letter-spacing:.4px}
+
+/* Misc */
+.divider{border:none;border-top:1px solid var(--border);margin:2rem 0}
+.note{background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.2);border-radius:var(--r);padding:1rem 1.2rem;font-size:.83rem;color:var(--muted);margin:1rem 0}
+.note strong{color:var(--blue2)}
+.warn{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:var(--r);padding:1rem 1.2rem;font-size:.83rem;color:var(--muted);margin:1rem 0}
+</style>
+</head>
+<body>
+
+<!-- ─── Navigation ─────────────────────────────────────────────────────────── -->
+<nav>
+<div class="container">
+<div class="nav-inner">
+  <div class="nav-brand">
+    <div class="dot"></div>
+    SRE Copilot — Architecture
+  </div>
+  <div class="nav-links">
+    <a href="#overview">Overview</a>
+    <a href="#layers">Layers</a>
+    <a href="#kafka">Kafka</a>
+    <a href="#agents">Agents</a>
+    <a href="#detection">Detection</a>
+    <a href="#correlation">Correlation</a>
+    <a href="#investigation">Investigation</a>
+    <a href="#knowledge-base">Knowledge</a>
+    <a href="#data-layer">Data Layer</a>
+    <a href="#execution-flow">Execution Flow</a>
+    <a href="#startup">Startup</a>
+    <a href="#cost">Cost</a>
+  </div>
+</div>
+</div>
+</nav>
+
+<!-- ─── Hero ──────────────────────────────────────────────────────────────── -->
+<div class="hero">
+<div class="container">
+  <div class="badge">Architecture Deep Dive</div>
+  <h1>SRE Copilot<br><span class="g">Architecture & Execution Flow</span></h1>
+  <p class="hero-sub">A comprehensive technical reference covering the system architecture, inter-agent communication patterns, execution flows, data layer design, and algorithmic details of the 7-agent autonomous incident response pipeline.</p>
+  <div class="stat-row">
+    <div class="stat"><div class="stat-val" style="color:var(--blue2)">26</div><div class="stat-label">Docker Services</div></div>
+    <div class="stat"><div class="stat-val" style="color:var(--purple2)">7</div><div class="stat-label">AI Agents</div></div>
+    <div class="stat"><div class="stat-val" style="color:var(--amber2)">14</div><div class="stat-label">Kafka Topics</div></div>
+    <div class="stat"><div class="stat-val" style="color:var(--green2)">5</div><div class="stat-label">Qdrant Collections</div></div>
+    <div class="stat"><div class="stat-val" style="color:var(--cyan2)">&lt;5min</div><div class="stat-label">Detection to Email</div></div>
+    <div class="stat"><div class="stat-val" style="color:var(--rose2)">~$0.055</div><div class="stat-label">Cost per Incident</div></div>
+  </div>
+</div>
+</div>
+
+<!-- ─── SECTION 1: System Overview ────────────────────────────────────────── -->
+<section id="overview">
+<div class="container">
+  <div class="section-tag" style="background:rgba(59,130,246,.1);color:var(--blue2)">Section 1</div>
+  <h2>High-Level System Architecture</h2>
+  <p>SRE Copilot is organized into five horizontal layers. Data flows top-to-bottom from simulated production traffic through ingestion, event routing, AI processing, and finally into the application and monitoring layer. The Knowledge Layer sits alongside the Agent Layer providing a RAG (Retrieval-Augmented Generation) service that agents query synchronously.</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1100 780" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:780px">
+      <defs>
+        <marker id="ah" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#4a6280"/></marker>
+        <marker id="ah-blue" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#3b82f6"/></marker>
+        <marker id="ah-purple" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#a855f7"/></marker>
+        <marker id="ah-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#22c55e"/></marker>
+        <filter id="glow"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <style>
+        .lbl{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#e2e8f0}
+        .lbl-sm{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#94a3b8;font-size:10px}
+        .lbl-xs{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#4a6280;font-size:9px}
+        .mono{font-family:'Courier New',monospace}
+      </style>
+
+      <!-- Layer backgrounds -->
+      <!-- SIMULATION -->
+      <rect x="10" y="10" width="1080" height="90" rx="10" fill="#1a1505" stroke="#f59e0b" stroke-width="1" stroke-opacity=".4"/>
+      <text x="22" y="28" class="lbl" font-size="9" font-weight="700" fill="#f59e0b" letter-spacing="1">SIMULATION LAYER</text>
+      <!-- Traffic Sim -->
+      <rect x="80" y="35" width="220" height="55" rx="8" fill="#1f1500" stroke="#f59e0b" stroke-width="1.5"/>
+      <text x="190" y="55" class="lbl" font-size="11" font-weight="700" text-anchor="middle" fill="#fbbf24">traffic-simulator</text>
+      <text x="190" y="70" class="lbl-sm" text-anchor="middle">Prometheus /metrics :8100</text>
+      <text x="190" y="82" class="lbl-xs" text-anchor="middle">Diurnal baseline + Redis failure blend</text>
+      <!-- Failure Inj -->
+      <rect x="330" y="35" width="200" height="55" rx="8" fill="#1f1500" stroke="#f59e0b" stroke-width="1.5"/>
+      <text x="430" y="55" class="lbl" font-size="11" font-weight="700" text-anchor="middle" fill="#fbbf24">failure-injector</text>
+      <text x="430" y="70" class="lbl-sm" text-anchor="middle">HTTP :8101 • 9 failure scenarios</text>
+      <text x="430" y="82" class="lbl-xs" text-anchor="middle">Redis failure:state:{service}</text>
+      <!-- Deploy Sim -->
+      <rect x="560" y="35" width="200" height="55" rx="8" fill="#1f1500" stroke="#f59e0b" stroke-width="1.5"/>
+      <text x="660" y="55" class="lbl" font-size="11" font-weight="700" text-anchor="middle" fill="#fbbf24">deployment-simulator</text>
+      <text x="660" y="70" class="lbl-sm" text-anchor="middle">HTTP :8102 • Postgres writes</text>
+      <text x="660" y="82" class="lbl-xs" text-anchor="middle">900–1800s deploy interval</text>
+
+      <!-- INGESTION -->
+      <rect x="10" y="115" width="1080" height="90" rx="10" fill="#0a1628" stroke="#3b82f6" stroke-width="1" stroke-opacity=".4"/>
+      <text x="22" y="133" class="lbl" font-size="9" font-weight="700" fill="#60a5fa" letter-spacing="1">INGESTION LAYER</text>
+      <!-- metrics-ingester -->
+      <rect x="80" y="138" width="220" height="55" rx="8" fill="#091422" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="190" y="158" class="lbl" font-size="11" font-weight="700" text-anchor="middle" fill="#93c5fd">metrics-ingester</text>
+      <text x="190" y="172" class="lbl-sm" text-anchor="middle">Prometheus → raw.metrics :8110</text>
+      <text x="190" y="184" class="lbl-xs" text-anchor="middle">Scrape every 15s</text>
+      <!-- log-ingester -->
+      <rect x="330" y="138" width="200" height="55" rx="8" fill="#091422" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="430" y="158" class="lbl" font-size="11" font-weight="700" text-anchor="middle" fill="#93c5fd">log-ingester</text>
+      <text x="430" y="172" class="lbl-sm" text-anchor="middle">Loki → raw.logs :8111</text>
+      <text x="430" y="184" class="lbl-xs" text-anchor="middle">Poll every 5s</text>
+      <!-- deployment-ingester -->
+      <rect x="560" y="138" width="200" height="55" rx="8" fill="#091422" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="660" y="158" class="lbl" font-size="11" font-weight="700" text-anchor="middle" fill="#93c5fd">deployment-ingester</text>
+      <text x="660" y="172" class="lbl-sm" text-anchor="middle">Postgres → raw.deployments</text>
+      <text x="660" y="184" class="lbl-xs" text-anchor="middle">Poll every 10s :8112</text>
+
+      <!-- Arrows sim→ingest -->
+      <line x1="190" y1="90" x2="190" y2="138" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ah)"/>
+      <line x1="430" y1="90" x2="430" y2="138" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ah)"/>
+      <line x1="660" y1="90" x2="660" y2="138" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ah)"/>
+
+      <!-- KAFKA EVENT BUS -->
+      <rect x="10" y="220" width="1080" height="100" rx="10" fill="#120a2a" stroke="#a855f7" stroke-width="1.5" stroke-opacity=".6"/>
+      <text x="22" y="238" class="lbl" font-size="9" font-weight="700" fill="#c084fc" letter-spacing="1">KAFKA EVENT BUS — 14 TOPICS • 6 PARTITIONS • 7d RETENTION</text>
+
+      <!-- Topic pills -->
+      <!-- Ingestion topics -->
+      <rect x="30" y="248" width="95" height="24" rx="5" fill="rgba(59,130,246,.15)" stroke="#3b82f6" stroke-width="1"/>
+      <text x="78" y="264" class="lbl mono" font-size="9" text-anchor="middle" fill="#93c5fd">raw.metrics</text>
+      <rect x="135" y="248" width="75" height="24" rx="5" fill="rgba(59,130,246,.15)" stroke="#3b82f6" stroke-width="1"/>
+      <text x="173" y="264" class="lbl mono" font-size="9" text-anchor="middle" fill="#93c5fd">raw.logs</text>
+      <rect x="220" y="248" width="110" height="24" rx="5" fill="rgba(59,130,246,.15)" stroke="#3b82f6" stroke-width="1"/>
+      <text x="275" y="264" class="lbl mono" font-size="9" text-anchor="middle" fill="#93c5fd">raw.deployments</text>
+
+      <!-- Detection topics -->
+      <rect x="350" y="248" width="130" height="24" rx="5" fill="rgba(239,68,68,.15)" stroke="#ef4444" stroke-width="1"/>
+      <text x="415" y="264" class="lbl mono" font-size="9" text-anchor="middle" fill="#f87171">anomalies.detected</text>
+      <rect x="492" y="248" width="140" height="24" rx="5" fill="rgba(239,68,68,.1)" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="562" y="264" class="lbl mono" font-size="9" text-anchor="middle" fill="#f87171" fill-opacity=".7">anomalies.suppressed</text>
+
+      <!-- Investigation topics -->
+      <rect x="30" y="285" width="120" height="24" rx="5" fill="rgba(234,179,8,.15)" stroke="#eab308" stroke-width="1"/>
+      <text x="90" y="301" class="lbl mono" font-size="9" text-anchor="middle" fill="#facc15">incidents.opened</text>
+      <rect x="162" y="285" width="110" height="24" rx="5" fill="rgba(234,179,8,.15)" stroke="#eab308" stroke-width="1"/>
+      <text x="217" y="301" class="lbl mono" font-size="9" text-anchor="middle" fill="#facc15">rca.completed</text>
+      <rect x="284" y="285" width="130" height="24" rx="5" fill="rgba(20,184,166,.15)" stroke="#14b8a6" stroke-width="1"/>
+      <text x="349" y="301" class="lbl mono" font-size="9" text-anchor="middle" fill="#2dd4bf">remediation.plans</text>
+
+      <!-- Resolution topics -->
+      <rect x="426" y="285" width="130" height="24" rx="5" fill="rgba(34,197,94,.15)" stroke="#22c55e" stroke-width="1"/>
+      <text x="491" y="301" class="lbl mono" font-size="9" text-anchor="middle" fill="#4ade80">incidents.resolved</text>
+      <rect x="568" y="285" width="160" height="24" rx="5" fill="rgba(139,92,246,.15)" stroke="#8b5cf6" stroke-width="1"/>
+      <text x="648" y="301" class="lbl mono" font-size="9" text-anchor="middle" fill="#a78bfa">postmortems.generated</text>
+
+      <!-- Control topics -->
+      <rect x="750" y="248" width="130" height="24" rx="5" fill="rgba(100,116,139,.12)" stroke="#475569" stroke-width="1"/>
+      <text x="815" y="264" class="lbl mono" font-size="9" text-anchor="middle" fill="#94a3b8">dead.letter.queue</text>
+      <rect x="892" y="248" width="130" height="24" rx="5" fill="rgba(100,116,139,.12)" stroke="#475569" stroke-width="1"/>
+      <text x="957" y="264" class="lbl mono" font-size="9" text-anchor="middle" fill="#94a3b8">agent.retry.events</text>
+      <rect x="750" y="285" width="120" height="24" rx="5" fill="rgba(6,182,212,.1)" stroke="#06b6d4" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="810" y="301" class="lbl mono" font-size="9" text-anchor="middle" fill="#22d3ee" fill-opacity=".7">notifications.sent</text>
+      <rect x="882" y="285" width="130" height="24" rx="5" fill="rgba(6,182,212,.1)" stroke="#06b6d4" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="947" y="301" class="lbl mono" font-size="9" text-anchor="middle" fill="#22d3ee" fill-opacity=".7">agent.audit.log</text>
+
+      <!-- Arrows ingest→kafka -->
+      <line x1="190" y1="193" x2="190" y2="248" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ah-blue)"/>
+      <line x1="430" y1="193" x2="430" y2="248" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ah-blue)"/>
+      <line x1="660" y1="193" x2="660" y2="248" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ah-blue)"/>
+
+      <!-- AGENT LAYER (left column) -->
+      <rect x="10" y="335" width="580" height="390" rx="10" fill="#0a1628" stroke="#1e3050" stroke-width="1"/>
+      <text x="22" y="353" class="lbl" font-size="9" font-weight="700" fill="#60a5fa" letter-spacing="1">AI AGENT PIPELINE</text>
+
+      <!-- Agent 1: Detection -->
+      <rect x="25" y="360" width="250" height="50" rx="7" fill="#150a0a" stroke="#ef4444" stroke-width="1.5"/>
+      <text x="40" y="378" class="lbl" font-size="10" font-weight="700" fill="#f87171">① Detection Agent</text>
+      <text x="40" y="392" class="lbl-sm">claude-haiku · z-score + LLM classify · :8200</text>
+      <text x="40" y="403" class="lbl-xs">Consumes: raw.metrics, raw.logs</text>
+
+      <!-- Agent 2: Correlation -->
+      <rect x="25" y="420" width="250" height="50" rx="7" fill="#180d00" stroke="#f97316" stroke-width="1.5"/>
+      <text x="40" y="438" class="lbl" font-size="10" font-weight="700" fill="#fb923c">② Correlation Agent</text>
+      <text x="40" y="452" class="lbl-sm">claude-sonnet · 30-min Kafka replay · :8201</text>
+      <text x="40" y="463" class="lbl-xs">Consumes: anomalies.detected</text>
+
+      <!-- Agent 3: Investigation -->
+      <rect x="25" y="480" width="250" height="50" rx="7" fill="#17150a" stroke="#eab308" stroke-width="1.5"/>
+      <text x="40" y="498" class="lbl" font-size="10" font-weight="700" fill="#facc15">③ Investigation Agent</text>
+      <text x="40" y="512" class="lbl-sm">claude-sonnet · tool-use RCA · :8202</text>
+      <text x="40" y="523" class="lbl-xs">5 parallel KR requests via Redis pub/sub</text>
+
+      <!-- Agent 4: KR -->
+      <rect x="25" y="540" width="250" height="50" rx="7" fill="#0a1a0a" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="40" y="558" class="lbl" font-size="10" font-weight="700" fill="#4ade80">④ Knowledge Retrieval</text>
+      <text x="40" y="572" class="lbl-sm">all-MiniLM-L6-v2 · Qdrant search · :8203</text>
+      <text x="40" y="583" class="lbl-xs">Redis BLPOP request queue (no Kafka)</text>
+
+      <!-- Agent 5: Remediation -->
+      <rect x="25" y="600" width="250" height="50" rx="7" fill="#091a18" stroke="#14b8a6" stroke-width="1.5"/>
+      <text x="40" y="618" class="lbl" font-size="10" font-weight="700" fill="#2dd4bf">⑤ Remediation Agent</text>
+      <text x="40" y="632" class="lbl-sm">claude-sonnet · runbook-grounded · :8204</text>
+      <text x="40" y="643" class="lbl-xs">Consumes: rca.completed</text>
+
+      <!-- Agent 6: Communication -->
+      <rect x="25" y="660" width="250" height="50" rx="7" fill="#091519" stroke="#06b6d4" stroke-width="1.5"/>
+      <text x="40" y="678" class="lbl" font-size="10" font-weight="700" fill="#22d3ee">⑥ Communication Agent</text>
+      <text x="40" y="692" class="lbl-sm">5 HTML email templates · SMTP · :8205</text>
+      <text x="40" y="703" class="lbl-xs">Consumes: 5 lifecycle topics simultaneously</text>
+
+      <!-- Agent 7: Postmortem -->
+      <rect x="25" y="720" width="250" height="50" rx="7" fill="#100a1e" stroke="#8b5cf6" stroke-width="1.5"/>
+      <text x="40" y="738" class="lbl" font-size="10" font-weight="700" fill="#a78bfa">⑦ Postmortem Agent</text>
+      <text x="40" y="752" class="lbl-sm">claude-sonnet × 6 passes · :8206</text>
+      <text x="40" y="763" class="lbl-xs">Consumes: incidents.resolved</text>
+
+      <!-- Arrows between agents (left side) -->
+      <line x1="150" y1="410" x2="150" y2="420" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ah)"/>
+      <line x1="150" y1="470" x2="150" y2="480" stroke="#f97316" stroke-width="1.5" marker-end="url(#ah)"/>
+      <line x1="150" y1="530" x2="150" y2="540" stroke="#eab308" stroke-width="1.5" marker-end="url(#ah)"/>
+      <line x1="150" y1="590" x2="150" y2="600" stroke="#22c55e" stroke-width="1.5" marker-end="url(#ah)"/>
+
+      <!-- Kafka → Agent arrows (right side) -->
+      <line x1="415" y1="320" x2="275" y2="385" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#ah)"/>
+      <line x1="90" y1="320" x2="90" y2="360" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ah)"/>
+
+      <!-- SRE API box (center in agent area) -->
+      <rect x="310" y="550" width="260" height="110" rx="8" fill="#091422" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="440" y="570" class="lbl" font-size="10" font-weight="700" text-anchor="middle" fill="#93c5fd">SRE API — sre-api :8000</text>
+      <text x="440" y="585" class="lbl-sm" text-anchor="middle">FastAPI · Incident dashboard</text>
+      <text x="440" y="598" class="lbl-sm" text-anchor="middle">REST: /incidents, /agents/health</text>
+      <text x="440" y="612" class="lbl-xs" text-anchor="middle">Postgres reads · Kafka → agent HTTP</text>
+      <text x="440" y="625" class="lbl-xs" text-anchor="middle">agent health checks on all :8200-8206</text>
+      <text x="440" y="643" class="lbl" font-size="8" text-anchor="middle" fill="#60a5fa">Grafana :3000 · Prometheus :9090</text>
+      <text x="440" y="656" class="lbl" font-size="8" text-anchor="middle" fill="#f59e0b">Mailhog :8025 · Kafka UI :8080</text>
+
+      <!-- KNOWLEDGE LAYER (right column) -->
+      <rect x="605" y="335" width="485" height="390" rx="10" fill="#0f0a1e" stroke="#6366f1" stroke-width="1" stroke-opacity=".5"/>
+      <text x="617" y="353" class="lbl" font-size="9" font-weight="700" fill="#818cf8" letter-spacing="1">KNOWLEDGE &amp; DATA LAYER</text>
+
+      <!-- Qdrant -->
+      <rect x="620" y="360" width="460" height="115" rx="8" fill="#0a0818" stroke="#8b5cf6" stroke-width="1.5"/>
+      <text x="630" y="378" class="lbl" font-size="10" font-weight="700" fill="#a78bfa">Qdrant Vector DB  :6333</text>
+      <text x="630" y="393" class="lbl-sm">5 collections · 384-dim · HNSW index (m=16, ef=100)</text>
+      <!-- Collection pills -->
+      <rect x="630" y="400" width="80" height="20" rx="4" fill="rgba(239,68,68,.12)" stroke="#ef4444" stroke-width=".8"/>
+      <text x="670" y="413" class="lbl mono" font-size="8" text-anchor="middle" fill="#f87171">incidents ×200</text>
+      <rect x="720" y="400" width="75" height="20" rx="4" fill="rgba(20,184,166,.12)" stroke="#14b8a6" stroke-width=".8"/>
+      <text x="758" y="413" class="lbl mono" font-size="8" text-anchor="middle" fill="#2dd4bf">runbooks ×45</text>
+      <rect x="805" y="400" width="85" height="20" rx="4" fill="rgba(59,130,246,.12)" stroke="#3b82f6" stroke-width=".8"/>
+      <text x="848" y="413" class="lbl mono" font-size="8" text-anchor="middle" fill="#93c5fd">architecture ×6</text>
+      <rect x="630" y="428" width="85" height="20" rx="4" fill="rgba(234,179,8,.12)" stroke="#eab308" stroke-width=".8"/>
+      <text x="673" y="441" class="lbl mono" font-size="8" text-anchor="middle" fill="#facc15">deployments ×30</text>
+      <rect x="725" y="428" width="90" height="20" rx="4" fill="rgba(139,92,246,.12)" stroke="#8b5cf6" stroke-width=".8"/>
+      <text x="770" y="441" class="lbl mono" font-size="8" text-anchor="middle" fill="#a78bfa">postmortems ×7</text>
+      <text x="630" y="463" class="lbl-xs">Embedding: all-MiniLM-L6-v2 (local, 384-dim) · Cross-encoder reranker</text>
+
+      <!-- PostgreSQL -->
+      <rect x="620" y="490" width="220" height="110" rx="8" fill="#091422" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="630" y="508" class="lbl" font-size="10" font-weight="700" fill="#93c5fd">PostgreSQL :5432</text>
+      <text x="630" y="523" class="lbl-sm">7 tables · 2 views · pg_trgm ext</text>
+      <text x="630" y="537" class="lbl-xs">incidents · postmortems · agent_events</text>
+      <text x="630" y="549" class="lbl-xs">email_notifications · deployments</text>
+      <text x="630" y="561" class="lbl-xs">metric_snapshots · service_registry</text>
+      <text x="630" y="573" class="lbl-xs">Views: active_incidents, incident_summary</text>
+      <text x="630" y="590" class="lbl-xs" fill="#4a6280">JSONB: correlation_context, blast_radius</text>
+      <text x="630" y="602" class="lbl-xs" fill="#4a6280">rca_candidates, remediation_plan</text>
+
+      <!-- Redis -->
+      <rect x="855" y="490" width="230" height="110" rx="8" fill="#0a1508" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="865" y="508" class="lbl" font-size="10" font-weight="700" fill="#4ade80">Redis :6379</text>
+      <text x="865" y="523" class="lbl-sm">6 key patterns · pub/sub KR channel</text>
+      <text x="865" y="537" class="lbl-xs">metric:{svc}:{name} — rolling baseline</text>
+      <text x="865" y="549" class="lbl-xs">dedup:{svc}:{type}:{metric} — 5min TTL</text>
+      <text x="865" y="561" class="lbl-xs">active_incident:{svc} — 30min TTL</text>
+      <text x="865" y="573" class="lbl-xs">kr:req/{res}:{id} — BLPUSH/BLPOP</text>
+      <text x="865" y="585" class="lbl-xs">error_count:{svc} — 60s counter</text>
+      <text x="865" y="597" class="lbl-xs">failure:state:{svc} — injector state</text>
+
+      <!-- Knowledge Seeder -->
+      <rect x="620" y="620" width="460" height="50" rx="8" fill="#0a0818" stroke="#6366f1" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="850" y="640" class="lbl" font-size="10" font-weight="700" text-anchor="middle" fill="#818cf8">knowledge-seeder (one-shot init job)</text>
+      <text x="850" y="656" class="lbl-sm" text-anchor="middle">Embeds incidents×200 + runbooks×45 + architecture×6 + deployments×30 + postmortems×7 → Qdrant</text>
+
+      <!-- Arrows kafka→agents (vertical) -->
+      <line x1="90" y1="320" x2="90" y2="360" stroke="#ef4444" stroke-width="1.5" marker-end="url(#ah)"/>
+
+      <!-- Arrow from kafka to knowledge layer -->
+      <line x1="600" y1="260" x2="848" y2="360" stroke="#6366f1" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#ah)"/>
+
+      <!-- Arrow investigation↔KR -->
+      <line x1="285" y1="505" x2="620" y2="400" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ah)"/>
+      <line x1="620" y1="415" x2="285" y2="525" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ah)"/>
+    </svg>
+    <div class="diagram-caption">Figure 1.1 — Complete system architecture showing all 5 layers, 26 services, and data flow paths. Dashed lines indicate asynchronous / polling patterns.</div>
+  </div>
+
+  <!-- Port reference table -->
+  <h3 style="margin-top:2rem">Service Port Map</h3>
+  <div class="two-col">
+    <table>
+      <thead><tr><th>Service</th><th>Port</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><strong>sre-api</strong></td><td><code>8000</code></td><td>Dashboard + REST API</td></tr>
+        <tr><td><strong>Mailhog UI</strong></td><td><code>8025</code></td><td>SMTP web interface</td></tr>
+        <tr><td><strong>Kafka UI</strong></td><td><code>8080</code></td><td>Topic / consumer group inspector</td></tr>
+        <tr><td><strong>Prometheus</strong></td><td><code>9090</code></td><td>Metric storage + alert rules</td></tr>
+        <tr><td><strong>Grafana</strong></td><td><code>3000</code></td><td>Dashboards (admin/admin)</td></tr>
+        <tr><td><strong>Loki</strong></td><td><code>3100</code></td><td>Log aggregation</td></tr>
+        <tr><td><strong>Qdrant</strong></td><td><code>6333/6334</code></td><td>Vector DB + gRPC</td></tr>
+        <tr><td><strong>Kafka</strong></td><td><code>9092</code></td><td>Internal broker</td></tr>
+        <tr><td><strong>Postgres</strong></td><td><code>5432</code></td><td>Primary relational store</td></tr>
+        <tr><td><strong>Redis</strong></td><td><code>6379</code></td><td>Baseline, dedup, KR pub/sub</td></tr>
+      </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Service</th><th>Port</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><strong>traffic-simulator</strong></td><td><code>8100</code></td><td>Prometheus /metrics endpoint</td></tr>
+        <tr><td><strong>failure-injector</strong></td><td><code>8101</code></td><td>Scenario injection HTTP API</td></tr>
+        <tr><td><strong>deployment-simulator</strong></td><td><code>8102</code></td><td>CI/CD event generator</td></tr>
+        <tr><td><strong>detection-agent</strong></td><td><code>8200</code></td><td>Anomaly detection</td></tr>
+        <tr><td><strong>correlation-agent</strong></td><td><code>8201</code></td><td>Incident context builder</td></tr>
+        <tr><td><strong>investigation-agent</strong></td><td><code>8202</code></td><td>LLM RCA orchestrator</td></tr>
+        <tr><td><strong>knowledge-retrieval</strong></td><td><code>8203</code></td><td>Qdrant vector search</td></tr>
+        <tr><td><strong>remediation-agent</strong></td><td><code>8204</code></td><td>Action plan generator</td></tr>
+        <tr><td><strong>communication-agent</strong></td><td><code>8205</code></td><td>Email dispatch</td></tr>
+        <tr><td><strong>postmortem-agent</strong></td><td><code>8206</code></td><td>6-pass postmortem writer</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</section>
+
+<!-- ─── SECTION 2: Simulated Microservice Topology ─────────────────────────── -->
+<section id="layers">
+<div class="container">
+  <div class="section-tag" style="background:rgba(245,158,11,.1);color:var(--amber2)">Section 2</div>
+  <h2>Simulated Microservice Topology</h2>
+  <p>Six production-like services with realistic SLAs and dependency relationships. The failure injector exploits these dependencies to generate realistic cascade failures that the Correlation Agent must untangle.</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 900 460" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:460px">
+      <defs>
+        <marker id="dep" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#4a6280"/></marker>
+        <marker id="dep-red" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#ef4444"/></marker>
+      </defs>
+      <style>.sn{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#e2e8f0;font-size:11px;font-weight:700}
+      .ss{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#94a3b8;font-size:9px}
+      .si{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#4a6280;font-size:8px}</style>
+
+      <!-- Infrastructure nodes -->
+      <rect x="50" y="390" width="80" height="40" rx="6" fill="#091422" stroke="#3b82f6" stroke-width="1"/>
+      <text x="90" y="408" class="sn" text-anchor="middle" fill="#60a5fa" font-size="9">postgres</text>
+      <text x="90" y="421" class="ss" text-anchor="middle">:5432</text>
+
+      <rect x="160" y="390" width="70" height="40" rx="6" fill="#0a1508" stroke="#22c55e" stroke-width="1"/>
+      <text x="195" y="408" class="sn" text-anchor="middle" fill="#4ade80" font-size="9">redis</text>
+      <text x="195" y="421" class="ss" text-anchor="middle">:6379</text>
+
+      <rect x="260" y="390" width="70" height="40" rx="6" fill="#120a2a" stroke="#a855f7" stroke-width="1"/>
+      <text x="295" y="408" class="sn" text-anchor="middle" fill="#c084fc" font-size="9">kafka</text>
+      <text x="295" y="421" class="ss" text-anchor="middle">:9092</text>
+
+      <!-- P0 Services — top row -->
+      <!-- api-gateway -->
+      <rect x="330" y="30" width="200" height="85" rx="8" fill="#150a0a" stroke="#ef4444" stroke-width="2"/>
+      <rect x="330" y="30" width="200" height="22" rx="8" fill="rgba(239,68,68,.2)"/>
+      <rect x="330" y="44" width="200" height="8" fill="rgba(239,68,68,.2)"/>
+      <text x="430" y="46" class="sn" text-anchor="middle" fill="#f87171">api-gateway</text>
+      <text x="350" y="68" class="ss">Criticality: P0 · Team: platform</text>
+      <text x="350" y="80" class="ss">SLA: P99 &lt;200ms · Error &lt;0.5%</text>
+      <text x="350" y="92" class="ss">On-call: platform-oncall@company.com</text>
+      <text x="350" y="104" class="si">Upstreams: none · Downstreams: 3 services</text>
+
+      <!-- payment-service -->
+      <rect x="50" y="185" width="200" height="85" rx="8" fill="#150a0a" stroke="#ef4444" stroke-width="2"/>
+      <text x="150" y="204" class="sn" text-anchor="middle" fill="#f87171">payment-service</text>
+      <text x="70" y="222" class="ss">Criticality: P0 · Team: payments</text>
+      <text x="70" y="234" class="ss">SLA: P99 &lt;500ms · Error &lt;0.1%</text>
+      <text x="70" y="246" class="ss">On-call: payments-oncall@company.com</text>
+      <text x="70" y="258" class="si">Downstream: postgres, redis</text>
+
+      <!-- order-service -->
+      <rect x="330" y="185" width="200" height="85" rx="8" fill="#150a0a" stroke="#ef4444" stroke-width="2"/>
+      <text x="430" y="204" class="sn" text-anchor="middle" fill="#f87171">order-service</text>
+      <text x="350" y="222" class="ss">Criticality: P0 · Team: commerce</text>
+      <text x="350" y="234" class="ss">SLA: P99 &lt;400ms · Error &lt;0.5%</text>
+      <text x="350" y="246" class="ss">On-call: commerce-oncall@company.com</text>
+      <text x="350" y="258" class="si">Downstream: payment, inventory, notif, kafka</text>
+
+      <!-- P1 services -->
+      <!-- user-service -->
+      <rect x="610" y="185" width="195" height="85" rx="8" fill="#17150a" stroke="#eab308" stroke-width="2"/>
+      <text x="708" y="204" class="sn" text-anchor="middle" fill="#facc15">user-service</text>
+      <text x="630" y="222" class="ss">Criticality: P1 · Team: identity</text>
+      <text x="630" y="234" class="ss">SLA: P99 &lt;300ms · Error &lt;0.5%</text>
+      <text x="630" y="246" class="ss">On-call: identity-oncall@company.com</text>
+      <text x="630" y="258" class="si">Downstream: postgres, redis</text>
+
+      <!-- inventory-service -->
+      <rect x="50" y="320" width="200" height="55" rx="8" fill="#17150a" stroke="#eab308" stroke-width="1.5"/>
+      <text x="150" y="339" class="sn" text-anchor="middle" fill="#facc15">inventory-service</text>
+      <text x="70" y="354" class="ss">P1 · commerce · P99&lt;400ms · &lt;1% err</text>
+      <text x="70" y="366" class="si">Downstream: postgres</text>
+
+      <!-- notification-service -->
+      <rect x="330" y="320" width="200" height="55" rx="8" fill="#17150a" stroke="#eab308" stroke-width="1.5"/>
+      <text x="430" y="339" class="sn" text-anchor="middle" fill="#facc15">notification-service</text>
+      <text x="350" y="354" class="ss">P1 · platform · P99&lt;1000ms · &lt;1% err</text>
+      <text x="350" y="366" class="si">Downstream: kafka</text>
+
+      <!-- Dependency arrows -->
+      <!-- api-gateway → payment-service -->
+      <line x1="380" y1="115" x2="200" y2="185" stroke="#ef4444" stroke-width="1.5" marker-end="url(#dep-red)"/>
+      <text x="260" y="148" class="si" fill="#f87171" text-anchor="middle">payment calls</text>
+
+      <!-- api-gateway → order-service -->
+      <line x1="430" y1="115" x2="430" y2="185" stroke="#ef4444" stroke-width="1.5" marker-end="url(#dep-red)"/>
+
+      <!-- api-gateway → user-service -->
+      <line x1="480" y1="115" x2="660" y2="185" stroke="#eab308" stroke-width="1.5" marker-end="url(#dep)"/>
+
+      <!-- payment → postgres -->
+      <line x1="100" y1="270" x2="100" y2="390" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#dep)"/>
+      <!-- payment → redis -->
+      <line x1="160" y1="270" x2="185" y2="390" stroke="#22c55e" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#dep)"/>
+
+      <!-- order → payment (cascade) -->
+      <line x1="330" y1="230" x2="250" y2="230" stroke="#f97316" stroke-width="2" marker-end="url(#dep)"/>
+      <text x="285" y="222" class="si" fill="#fb923c" text-anchor="middle">cascade!</text>
+
+      <!-- order → inventory -->
+      <line x1="380" y1="270" x2="200" y2="320" stroke="#eab308" stroke-width="1.5" marker-end="url(#dep)"/>
+      <!-- order → notification -->
+      <line x1="430" y1="270" x2="430" y2="320" stroke="#eab308" stroke-width="1.5" marker-end="url(#dep)"/>
+
+      <!-- user → postgres -->
+      <line x1="660" y1="270" x2="120" y2="390" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#dep)"/>
+      <!-- user → redis -->
+      <line x1="708" y1="270" x2="200" y2="390" stroke="#22c55e" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#dep)"/>
+
+      <!-- inventory → postgres -->
+      <line x1="90" y1="375" x2="90" y2="390" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#dep)"/>
+      <!-- notification → kafka -->
+      <line x1="430" y1="375" x2="310" y2="390" stroke="#a855f7" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#dep)"/>
+
+      <!-- Legend -->
+      <line x1="700" y1="350" x2="730" y2="350" stroke="#ef4444" stroke-width="2"/>
+      <text x="736" y="354" class="ss" fill="#f87171">P0 critical path</text>
+      <line x1="700" y1="368" x2="730" y2="368" stroke="#eab308" stroke-width="1.5"/>
+      <text x="736" y="372" class="ss" fill="#facc15">P1 dependency</text>
+      <line x1="700" y1="386" x2="730" y2="386" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="736" y="390" class="ss" fill="#93c5fd">infrastructure dep</text>
+      <line x1="700" y1="404" x2="730" y2="404" stroke="#f97316" stroke-width="2"/>
+      <text x="736" y="408" class="ss" fill="#fb923c">cascade failure path</text>
+    </svg>
+    <div class="diagram-caption">Figure 2.1 — Microservice dependency graph. A payment-service failure propagates upstream through order-service, which holds DB transactions open waiting for payment validation, exhausting its connection pool — a cascade the Correlation Agent identifies as DEPENDENCY_CASCADE signal.</div>
+  </div>
+
+  <h3>Failure Injection Scenarios</h3>
+  <table>
+    <thead><tr><th>Scenario</th><th>Service</th><th>Injected Signal</th><th>Duration</th><th>Expected Detection</th><th>Sigma Range</th></tr></thead>
+    <tbody>
+      <tr><td><strong>LATENCY_SPIKE</strong></td><td>payment-service</td><td>P99 → 8,500ms</td><td>5 min</td><td><span class="tag tag-critical">CRITICAL &lt;60s</span></td><td>&gt;5.0σ</td></tr>
+      <tr><td><strong>ERROR_RATE_SPIKE</strong></td><td>order-service</td><td>error rate → 45%</td><td>3 min</td><td><span class="tag tag-critical">CRITICAL</span></td><td>&gt;6.0σ</td></tr>
+      <tr><td><strong>CPU_SATURATION</strong></td><td>api-gateway</td><td>CPU → 95%</td><td>8 min</td><td><span class="tag tag-high">HIGH</span></td><td>&gt;5.5σ</td></tr>
+      <tr><td><strong>MEMORY_LEAK</strong></td><td>notification-service</td><td>memory → 96%</td><td>12 min</td><td><span class="tag tag-high">HIGH</span></td><td>&gt;5.0σ</td></tr>
+      <tr><td><strong>DB_CONNECTION_EXHAUSTION</strong></td><td>payment-service</td><td>connections → 99/100</td><td>6 min</td><td><span class="tag tag-critical">CRITICAL</span></td><td>&gt;4.0σ</td></tr>
+      <tr><td><strong>KAFKA_CONSUMER_LAG</strong></td><td>order-service</td><td>lag → 52,000 msgs</td><td>10 min</td><td><span class="tag tag-high">HIGH</span></td><td>&gt;5.0σ</td></tr>
+      <tr><td><strong>DEPENDENCY_OUTAGE</strong></td><td>inventory-service</td><td>errors → 98%</td><td>5 min</td><td><span class="tag tag-high">HIGH</span></td><td>&gt;3.5σ</td></tr>
+      <tr><td><strong>DEPLOYMENT_FAILURE</strong></td><td>user-service</td><td>errors → 100% + deploy event</td><td>4 min</td><td><span class="tag tag-critical">CRITICAL</span></td><td>&gt;6.0σ</td></tr>
+      <tr><td><strong>NETWORK_PARTITION</strong></td><td>payment-service</td><td>connection resets</td><td>3 min</td><td><span class="tag tag-high">HIGH</span></td><td>&gt;3.0σ</td></tr>
+    </tbody>
+  </table>
+  <p class="note"><strong>How failure injection works:</strong> The failure-injector writes anomalous metric values to Redis at key <code>failure:state:{service}</code>. The traffic-simulator reads this state on every metric generation tick and blends it into the Prometheus metrics endpoint. This decouples failure definition from metric generation — adding a new scenario requires zero changes to the traffic simulator.</p>
+</div>
+</section>
+
+<!-- ─── SECTION 3: Kafka Design ────────────────────────────────────────────── -->
+<section id="kafka">
+<div class="container">
+  <div class="section-tag" style="background:rgba(168,85,247,.1);color:var(--purple2)">Section 3</div>
+  <h2>Kafka Event Bus Design</h2>
+  <p>All inter-agent communication flows through Kafka (except the synchronous KR pub/sub). Using an event log instead of REST is a deliberate architectural choice — it enables temporal replay (Correlation Agent reads 30 minutes of history), guaranteed delivery during agent restarts, and a first-class audit trail.</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1050 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:320px">
+      <defs>
+        <marker id="kaf" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#a855f7"/></marker>
+      </defs>
+      <style>.kt{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#e2e8f0;font-size:9px;font-weight:700}
+      .ks{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#94a3b8;font-size:8px}
+      .kg{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#4a6280;font-size:8px;font-style:italic}
+      .mono{font-family:'Courier New',monospace}</style>
+
+      <!-- Group: Ingestion -->
+      <rect x="10" y="10" width="190" height="145" rx="8" fill="rgba(59,130,246,.06)" stroke="#3b82f6" stroke-width="1"/>
+      <text x="20" y="26" class="kt" fill="#60a5fa">INGESTION</text>
+      <text x="20" y="36" class="kg">part=6 · ret=7d</text>
+      <rect x="20" y="42" width="165" height="26" rx="5" fill="rgba(59,130,246,.15)" stroke="#3b82f6" stroke-width="1"/>
+      <text x="103" y="59" class="kt mono" text-anchor="middle" fill="#93c5fd">raw.metrics</text>
+      <rect x="20" y="76" width="165" height="26" rx="5" fill="rgba(59,130,246,.15)" stroke="#3b82f6" stroke-width="1"/>
+      <text x="103" y="93" class="kt mono" text-anchor="middle" fill="#93c5fd">raw.logs</text>
+      <rect x="20" y="110" width="165" height="26" rx="5" fill="rgba(59,130,246,.15)" stroke="#3b82f6" stroke-width="1"/>
+      <text x="103" y="127" class="kt mono" text-anchor="middle" fill="#93c5fd">raw.deployments</text>
+      <text x="20" y="148" class="ks">Consumer: metrics-ingester, log-ingester</text>
+
+      <!-- Arrow → Detection -->
+      <line x1="200" y1="75" x2="240" y2="75" stroke="#a855f7" stroke-width="1.5" marker-end="url(#kaf)"/>
+
+      <!-- Group: Detection -->
+      <rect x="240" y="10" width="175" height="145" rx="8" fill="rgba(239,68,68,.06)" stroke="#ef4444" stroke-width="1"/>
+      <text x="250" y="26" class="kt" fill="#f87171">DETECTION</text>
+      <text x="250" y="36" class="kg">part=3 · ret=30d</text>
+      <rect x="250" y="42" width="150" height="26" rx="5" fill="rgba(239,68,68,.15)" stroke="#ef4444" stroke-width="1"/>
+      <text x="325" y="59" class="kt mono" text-anchor="middle" fill="#f87171">anomalies.detected</text>
+      <rect x="250" y="76" width="150" height="26" rx="5" fill="rgba(239,68,68,.08)" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="325" y="93" class="kt mono" text-anchor="middle" fill="#f87171" fill-opacity=".6">anomalies.suppressed</text>
+      <text x="250" y="145" class="ks">Consumer: correlation-agent, comm-agent</text>
+
+      <!-- Arrow → Investigation -->
+      <line x1="415" y1="55" x2="455" y2="55" stroke="#a855f7" stroke-width="1.5" marker-end="url(#kaf)"/>
+
+      <!-- Group: Investigation -->
+      <rect x="455" y="10" width="165" height="145" rx="8" fill="rgba(234,179,8,.06)" stroke="#eab308" stroke-width="1"/>
+      <text x="465" y="26" class="kt" fill="#facc15">INVESTIGATION</text>
+      <text x="465" y="36" class="kg">part=3 · ret=90d</text>
+      <rect x="465" y="42" width="145" height="26" rx="5" fill="rgba(234,179,8,.15)" stroke="#eab308" stroke-width="1"/>
+      <text x="538" y="59" class="kt mono" text-anchor="middle" fill="#facc15">incidents.opened</text>
+      <rect x="465" y="76" width="145" height="26" rx="5" fill="rgba(234,179,8,.15)" stroke="#eab308" stroke-width="1"/>
+      <text x="538" y="93" class="kt mono" text-anchor="middle" fill="#facc15">rca.completed</text>
+      <rect x="465" y="110" width="145" height="26" rx="5" fill="rgba(20,184,166,.15)" stroke="#14b8a6" stroke-width="1"/>
+      <text x="538" y="127" class="kt mono" text-anchor="middle" fill="#2dd4bf">remediation.plans</text>
+      <text x="465" y="148" class="ks">Consumers: investigation, remediation, comm</text>
+
+      <!-- Arrow → Resolution -->
+      <line x1="620" y1="75" x2="660" y2="75" stroke="#a855f7" stroke-width="1.5" marker-end="url(#kaf)"/>
+
+      <!-- Group: Resolution -->
+      <rect x="660" y="10" width="170" height="145" rx="8" fill="rgba(34,197,94,.06)" stroke="#22c55e" stroke-width="1"/>
+      <text x="670" y="26" class="kt" fill="#4ade80">RESOLUTION</text>
+      <text x="670" y="36" class="kg">part=3 · ret=90d</text>
+      <rect x="670" y="42" width="150" height="26" rx="5" fill="rgba(34,197,94,.15)" stroke="#22c55e" stroke-width="1"/>
+      <text x="745" y="59" class="kt mono" text-anchor="middle" fill="#4ade80">incidents.resolved</text>
+      <rect x="670" y="76" width="150" height="26" rx="5" fill="rgba(139,92,246,.15)" stroke="#8b5cf6" stroke-width="1"/>
+      <text x="745" y="93" class="kt mono" text-anchor="middle" fill="#a78bfa">postmortems.generated</text>
+      <text x="670" y="120" class="ks">Consumers: postmortem-agent, comm-agent</text>
+      <text x="670" y="132" class="kg">Resolution triggered by investigation-agent</text>
+      <text x="670" y="144" class="kg">background thread (metric polling)</text>
+
+      <!-- Group: Control -->
+      <rect x="850" y="10" width="185" height="145" rx="8" fill="rgba(100,116,139,.06)" stroke="#475569" stroke-width="1"/>
+      <text x="860" y="26" class="kt" fill="#94a3b8">CONTROL</text>
+      <text x="860" y="36" class="kg">part=3 · ret=30d</text>
+      <rect x="860" y="42" width="160" height="26" rx="5" fill="rgba(100,116,139,.12)" stroke="#475569" stroke-width="1"/>
+      <text x="940" y="59" class="kt mono" text-anchor="middle" fill="#94a3b8">dead.letter.queue</text>
+      <rect x="860" y="76" width="160" height="26" rx="5" fill="rgba(100,116,139,.12)" stroke="#475569" stroke-width="1"/>
+      <text x="940" y="93" class="kt mono" text-anchor="middle" fill="#94a3b8">agent.retry.events</text>
+      <rect x="860" y="110" width="160" height="26" rx="5" fill="rgba(6,182,212,.1)" stroke="#06b6d4" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="940" y="127" class="kt mono" text-anchor="middle" fill="#22d3ee" fill-opacity=".7">agent.audit.log</text>
+      <text x="860" y="148" class="ks">DLQ: failed processing after 3 retries</text>
+
+      <!-- Consumer group table -->
+      <rect x="10" y="175" width="1025" height="130" rx="8" fill="rgba(22,35,64,.5)" stroke="#1e3050" stroke-width="1"/>
+      <text x="20" y="193" class="kt" fill="#94a3b8">CONSUMER GROUPS</text>
+      <text x="20" y="210" class="ks">detection-agent →</text><text x="130" y="210" class="kt mono" fill="#93c5fd">raw.metrics, raw.logs</text>
+      <text x="400" y="210" class="ks">correlation-agent →</text><text x="512" y="210" class="kt mono" fill="#f87171">anomalies.detected</text>
+      <text x="20" y="228" class="ks">investigation-agent →</text><text x="140" y="228" class="kt mono" fill="#facc15">incidents.opened</text>
+      <text x="400" y="228" class="ks">remediation-agent →</text><text x="514" y="228" class="kt mono" fill="#2dd4bf">rca.completed</text>
+      <text x="700" y="228" class="ks">postmortem-agent →</text><text x="815" y="228" class="kt mono" fill="#4ade80">incidents.resolved</text>
+      <text x="20" y="246" class="ks">communication-agent →</text><text x="155" y="246" class="kt mono" fill="#22d3ee">anomalies.detected, rca.completed, remediation.plans, incidents.resolved, postmortems.generated</text>
+      <text x="20" y="265" class="kt" fill="#94a3b8">KEY DESIGN NOTES</text>
+      <text x="20" y="282" class="ks">• All agents use earliest offset reset — missed events during restart are processed in order on recovery</text>
+      <text x="20" y="296" class="ks">• replay_window() seeks to specific timestamp offset for correlation; not a separate topic, same raw.metrics log</text>
+    </svg>
+    <div class="diagram-caption">Figure 3.1 — Kafka topic topology showing 5 topic groups, consumer group assignments, and message flow direction. 14 topics total across 5 semantic groups.</div>
+  </div>
+
+  <div class="note"><strong>Why Kafka enables temporal correlation:</strong> The Correlation Agent's killer feature is <code>replay_window()</code> — it seeks the raw.metrics consumer to a timestamp 30 minutes in the past and reads forward, collecting metric history for the affected service and its dependencies. This pattern is impossible with REST APIs that don't retain history. The entire correlation context is assembled from a single Kafka log replay with no additional storage required.</div>
+</div>
+</section>
+
+<!-- ─── SECTION 4: Agent Pipeline ──────────────────────────────────────────── -->
+<section id="agents">
+<div class="container">
+  <div class="section-tag" style="background:rgba(99,102,241,.1);color:var(--indigo2)">Section 4</div>
+  <h2>Agent Pipeline Overview</h2>
+  <p>Seven autonomous agents form a sequential pipeline triggered by Kafka events. Each agent owns exactly one concern, uses the minimum model capability required for its task, and communicates exclusively via Kafka (except Knowledge Retrieval which uses synchronous Redis pub/sub).</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1050 420" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:420px">
+      <defs>
+        <marker id="pipe" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#6366f1"/></marker>
+        <marker id="pipe-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#22c55e"/></marker>
+      </defs>
+      <style>.at{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#e2e8f0;font-size:11px;font-weight:700}
+      .as{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#94a3b8;font-size:9px}
+      .ai{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#4a6280;font-size:8.5px}
+      .mono{font-family:'Courier New',monospace}</style>
+
+      <!-- Agent boxes (horizontal pipeline) -->
+      <!-- 1. Detection -->
+      <rect x="10" y="30" width="135" height="115" rx="8" fill="#150a0a" stroke="#ef4444" stroke-width="2"/>
+      <rect x="10" y="30" width="135" height="22" rx="8" fill="rgba(239,68,68,.2)"/>
+      <rect x="10" y="44" width="135" height="8" fill="rgba(239,68,68,.2)"/>
+      <text x="78" y="48" class="at" text-anchor="middle" fill="#f87171" font-size="10">① Detection</text>
+      <text x="78" y="66" class="as" text-anchor="middle">claude-haiku</text>
+      <text x="78" y="80" class="as" text-anchor="middle">~500 tokens/event</text>
+      <text x="78" y="94" class="as" text-anchor="middle">z-score + LLM classify</text>
+      <text x="78" y="108" class="ai" text-anchor="middle">Trigger: raw.metrics, raw.logs</text>
+      <text x="78" y="120" class="ai" text-anchor="middle">Emits: anomalies.detected</text>
+      <text x="78" y="134" class="ai" text-anchor="middle" fill="#ef4444">port :8200</text>
+
+      <!-- arrow -->
+      <line x1="145" y1="87" x2="165" y2="87" stroke="#6366f1" stroke-width="2" marker-end="url(#pipe)"/>
+      <text x="153" y="80" class="ai" fill="#818cf8" font-size="7">Kafka</text>
+
+      <!-- 2. Correlation -->
+      <rect x="165" y="30" width="140" height="115" rx="8" fill="#180d00" stroke="#f97316" stroke-width="2"/>
+      <rect x="165" y="30" width="140" height="22" rx="8" fill="rgba(249,115,22,.2)"/>
+      <rect x="165" y="44" width="140" height="8" fill="rgba(249,115,22,.2)"/>
+      <text x="235" y="48" class="at" text-anchor="middle" fill="#fb923c" font-size="10">② Correlation</text>
+      <text x="235" y="66" class="as" text-anchor="middle">claude-sonnet</text>
+      <text x="235" y="80" class="as" text-anchor="middle">~1,500 tokens/incident</text>
+      <text x="235" y="94" class="as" text-anchor="middle">30-min Kafka replay</text>
+      <text x="235" y="108" class="ai" text-anchor="middle">Trigger: anomalies.detected</text>
+      <text x="235" y="120" class="ai" text-anchor="middle">Emits: incidents.opened</text>
+      <text x="235" y="134" class="ai" text-anchor="middle" fill="#f97316">port :8201</text>
+
+      <line x1="305" y1="87" x2="325" y2="87" stroke="#6366f1" stroke-width="2" marker-end="url(#pipe)"/>
+      <text x="313" y="80" class="ai" fill="#818cf8" font-size="7">Kafka</text>
+
+      <!-- 3. Investigation -->
+      <rect x="325" y="30" width="150" height="115" rx="8" fill="#17150a" stroke="#eab308" stroke-width="2"/>
+      <rect x="325" y="30" width="150" height="22" rx="8" fill="rgba(234,179,8,.2)"/>
+      <rect x="325" y="44" width="150" height="8" fill="rgba(234,179,8,.2)"/>
+      <text x="400" y="48" class="at" text-anchor="middle" fill="#facc15" font-size="10">③ Investigation</text>
+      <text x="400" y="66" class="as" text-anchor="middle">claude-sonnet + tool-use</text>
+      <text x="400" y="80" class="as" text-anchor="middle">~8,000 tokens/incident</text>
+      <text x="400" y="94" class="as" text-anchor="middle">5 parallel KR requests</text>
+      <text x="400" y="108" class="ai" text-anchor="middle">Trigger: incidents.opened</text>
+      <text x="400" y="120" class="ai" text-anchor="middle">Emits: rca.completed</text>
+      <text x="400" y="134" class="ai" text-anchor="middle" fill="#eab308">port :8202</text>
+
+      <line x1="475" y1="87" x2="495" y2="87" stroke="#6366f1" stroke-width="2" marker-end="url(#pipe)"/>
+      <text x="483" y="80" class="ai" fill="#818cf8" font-size="7">Kafka</text>
+
+      <!-- 5. Remediation (skip 4 which is lateral) -->
+      <rect x="495" y="30" width="140" height="115" rx="8" fill="#091a18" stroke="#14b8a6" stroke-width="2"/>
+      <rect x="495" y="30" width="140" height="22" rx="8" fill="rgba(20,184,166,.2)"/>
+      <rect x="495" y="44" width="140" height="8" fill="rgba(20,184,166,.2)"/>
+      <text x="565" y="48" class="at" text-anchor="middle" fill="#2dd4bf" font-size="10">⑤ Remediation</text>
+      <text x="565" y="66" class="as" text-anchor="middle">claude-sonnet</text>
+      <text x="565" y="80" class="as" text-anchor="middle">~3,000 tokens/incident</text>
+      <text x="565" y="94" class="as" text-anchor="middle">runbook-grounded steps</text>
+      <text x="565" y="108" class="ai" text-anchor="middle">Trigger: rca.completed</text>
+      <text x="565" y="120" class="ai" text-anchor="middle">Emits: remediation.plans</text>
+      <text x="565" y="134" class="ai" text-anchor="middle" fill="#14b8a6">port :8204</text>
+
+      <line x1="635" y1="87" x2="655" y2="87" stroke="#6366f1" stroke-width="2" marker-end="url(#pipe)"/>
+      <text x="643" y="80" class="ai" fill="#818cf8" font-size="7">Kafka</text>
+
+      <!-- 6. Communication (receives from all 5 topics) -->
+      <rect x="655" y="30" width="145" height="115" rx="8" fill="#091519" stroke="#06b6d4" stroke-width="2"/>
+      <rect x="655" y="30" width="145" height="22" rx="8" fill="rgba(6,182,212,.2)"/>
+      <rect x="655" y="44" width="145" height="8" fill="rgba(6,182,212,.2)"/>
+      <text x="728" y="48" class="at" text-anchor="middle" fill="#22d3ee" font-size="10">⑥ Communication</text>
+      <text x="728" y="66" class="as" text-anchor="middle">5 HTML templates</text>
+      <text x="728" y="80" class="as" text-anchor="middle">SMTP → Mailhog</text>
+      <text x="728" y="94" class="as" text-anchor="middle">role-based routing</text>
+      <text x="728" y="108" class="ai" text-anchor="middle">Trigger: all 5 topics</text>
+      <text x="728" y="120" class="ai" text-anchor="middle">oncall / management / all</text>
+      <text x="728" y="134" class="ai" text-anchor="middle" fill="#06b6d4">port :8205</text>
+
+      <line x1="800" y1="87" x2="820" y2="87" stroke="#6366f1" stroke-width="2" marker-end="url(#pipe)"/>
+      <text x="808" y="80" class="ai" fill="#818cf8" font-size="7">Kafka</text>
+
+      <!-- 7. Postmortem -->
+      <rect x="820" y="30" width="215" height="115" rx="8" fill="#100a1e" stroke="#8b5cf6" stroke-width="2"/>
+      <rect x="820" y="30" width="215" height="22" rx="8" fill="rgba(139,92,246,.2)"/>
+      <rect x="820" y="44" width="215" height="8" fill="rgba(139,92,246,.2)"/>
+      <text x="928" y="48" class="at" text-anchor="middle" fill="#a78bfa" font-size="10">⑦ Postmortem</text>
+      <text x="928" y="66" class="as" text-anchor="middle">claude-sonnet × 6 LLM passes</text>
+      <text x="928" y="80" class="as" text-anchor="middle">~6,000 tokens/incident total</text>
+      <text x="928" y="94" class="as" text-anchor="middle">exec → timeline → rca → impact</text>
+      <text x="928" y="108" class="ai" text-anchor="middle">Trigger: incidents.resolved</text>
+      <text x="928" y="120" class="ai" text-anchor="middle">Emits: postmortems.generated</text>
+      <text x="928" y="134" class="ai" text-anchor="middle" fill="#8b5cf6">port :8206</text>
+
+      <!-- ④ KR Agent (lateral) -->
+      <rect x="325" y="195" width="315" height="90" rx="8" fill="#0a1a0a" stroke="#22c55e" stroke-width="2"/>
+      <rect x="325" y="195" width="315" height="22" rx="8" fill="rgba(34,197,94,.15)"/>
+      <text x="483" y="213" class="at" text-anchor="middle" fill="#4ade80" font-size="10">④ Knowledge Retrieval Agent  — NOT a Kafka consumer</text>
+      <text x="483" y="232" class="as" text-anchor="middle">all-MiniLM-L6-v2 (local, 384-dim) · Qdrant vector search · cross-encoder reranker</text>
+      <text x="483" y="248" class="as" text-anchor="middle">Redis BLPOP loop: pop kr:req:{id} → search Qdrant → push kr:res:{id} · 15s timeout</text>
+      <text x="483" y="264" class="as" text-anchor="middle">5 query handlers: incidents / runbooks / architecture / deployments / postmortems</text>
+      <text x="483" y="275" class="ai" text-anchor="middle" fill="#22c55e">port :8203</text>
+
+      <!-- Investigation ↔ KR arrows -->
+      <line x1="400" y1="145" x2="400" y2="195" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#pipe-green)"/>
+      <text x="408" y="172" class="ai" fill="#4ade80">5× parallel</text>
+      <text x="408" y="182" class="ai" fill="#4ade80">requests</text>
+      <line x1="430" y1="195" x2="430" y2="145" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#pipe-green)"/>
+      <text x="450" y="172" class="ai" fill="#4ade80">ranked</text>
+      <text x="450" y="182" class="ai" fill="#4ade80">context</text>
+
+      <!-- Remediation → KR arrow -->
+      <line x1="565" y1="145" x2="565" y2="195" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#pipe-green)"/>
+      <text x="574" y="172" class="ai" fill="#4ade80">runbook</text>
+      <text x="574" y="182" class="ai" fill="#4ade80">lookup</text>
+      <line x1="590" y1="195" x2="590" y2="145" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#pipe-green)"/>
+
+      <!-- Communication fan-in arrows (from multiple topics) -->
+      <path d="M 78 145 L 78 175 L 728 175 L 728 145" stroke="#06b6d4" stroke-width="1" stroke-dasharray="3,3" fill="none" marker-end="url(#pipe)"/>
+      <text x="400" y="170" class="ai" fill="#22d3ee" text-anchor="middle">Communication Agent subscribes to all 5 lifecycle topics simultaneously</text>
+
+      <!-- Investigation → resolution monitor box -->
+      <rect x="10" y="195" width="305" height="70" rx="8" fill="#091422" stroke="#1e3050" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="163" y="213" class="at" text-anchor="middle" fill="#60a5fa" font-size="9">Resolution Monitor (background thread in Investigation Agent)</text>
+      <text x="163" y="228" class="as" text-anchor="middle">Polls trigger metric in Redis every 30s</text>
+      <text x="163" y="242" class="as" text-anchor="middle">Resolves when metric within 30% of baseline</text>
+      <text x="163" y="256" class="as" text-anchor="middle">Max 30-min timeout → publishes incidents.resolved</text>
+      <line x1="400" y1="145" x2="200" y2="195" stroke="#60a5fa" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#pipe)"/>
+
+      <!-- Token & cost summary -->
+      <rect x="10" y="310" width="1025" height="100" rx="8" fill="rgba(22,35,64,.5)" stroke="#1e3050" stroke-width="1"/>
+      <text x="20" y="328" class="at" fill="#94a3b8">AGENT COST &amp; LATENCY SUMMARY</text>
+      <text x="20" y="348" class="ks">Agent</text><text x="130" y="348" class="ks">Model</text><text x="270" y="348" class="ks">Avg Tokens</text><text x="400" y="348" class="ks">Est. Cost</text><text x="520" y="348" class="ks">Latency</text><text x="650" y="348" class="ks">Purpose</text>
+      <line x1="10" y1="352" x2="1035" y2="352" stroke="#162340" stroke-width="1"/>
+      <text x="20" y="366" class="as" fill="#f87171">Detection</text><text x="130" y="366" class="as">haiku</text><text x="270" y="366" class="as">~500/event</text><text x="400" y="366" class="as">~$0.0004</text><text x="520" y="366" class="as">&lt;2s</text><text x="650" y="366" class="as">Fast classification, high throughput</text>
+      <text x="20" y="380" class="as" fill="#fb923c">Correlation</text><text x="130" y="380" class="as">sonnet</text><text x="270" y="380" class="as">~1,500</text><text x="400" y="380" class="as">~$0.0045</text><text x="520" y="380" class="as">&lt;30s</text><text x="650" y="380" class="as">Build incident context from replay</text>
+      <text x="20" y="394" class="as" fill="#facc15">Investigation</text><text x="130" y="394" class="as">sonnet</text><text x="270" y="394" class="as">~8,000</text><text x="400" y="394" class="as">~$0.024</text><text x="520" y="394" class="as">&lt;2min</text><text x="650" y="394" class="as">Deep RCA with tool-use loop</text>
+      <text x="20" y="408" class="as" fill="#2dd4bf">Remediation</text><text x="530" y="408" class="as">~3,000</text><text x="650" y="408" class="as">~$0.009</text><text x="780" y="408" class="as">~20s</text><text x="900" y="408" class="as">Runbook-grounded plan</text>
+    </svg>
+    <div class="diagram-caption">Figure 4.1 — Full agent pipeline. Agents 1–3 and 5–7 form a Kafka-driven pipeline. Agent 4 (Knowledge Retrieval) is a synchronous service using Redis pub/sub, called by Investigation and Remediation agents. The resolution monitor is a background thread inside the Investigation Agent.</div>
+  </div>
+</div>
+</section>
+
+<!-- ─── SECTION 5: Detection Agent Deep Dive ──────────────────────────────── -->
+<section id="detection">
+<div class="container">
+  <div class="section-tag" style="background:rgba(239,68,68,.1);color:var(--red2)">Section 5</div>
+  <h2>Detection Agent — Deep Dive</h2>
+  <p>The Detection Agent is the system's first line of defense. It uses a two-tier approach: a cheap statistical gate that runs on every event, followed by an LLM classifier that only fires when the statistical gate passes. This ensures the LLM is never called on noise.</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 900 480" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:480px">
+      <defs>
+        <marker id="det" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#ef4444"/></marker>
+        <marker id="det-gray" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#4a6280"/></marker>
+      </defs>
+      <style>.dt{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#e2e8f0;font-size:10px;font-weight:700}
+      .ds{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#94a3b8;font-size:9px}
+      .di{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#4a6280;font-size:8.5px}
+      .mono{font-family:'Courier New',monospace}</style>
+
+      <!-- Raw event input -->
+      <rect x="30" y="20" width="165" height="50" rx="8" fill="#091422" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="113" y="42" class="dt" text-anchor="middle" fill="#93c5fd">raw.metrics event</text>
+      <text x="113" y="56" class="ds" text-anchor="middle">RawMetricEvent (Kafka)</text>
+
+      <!-- Arrow down -->
+      <line x1="113" y1="70" x2="113" y2="100" stroke="#ef4444" stroke-width="2" marker-end="url(#det)"/>
+
+      <!-- Step 1: Filter -->
+      <rect x="30" y="100" width="165" height="50" rx="8" fill="#150a0a" stroke="#ef4444" stroke-width="1.5"/>
+      <text x="113" y="120" class="dt" text-anchor="middle" fill="#f87171">Metric filter</text>
+      <text x="113" y="134" class="ds" text-anchor="middle">6 monitored metrics only</text>
+
+      <line x1="113" y1="150" x2="113" y2="180" stroke="#ef4444" stroke-width="2" marker-end="url(#det)"/>
+
+      <!-- Step 2: Redis push -->
+      <rect x="30" y="180" width="165" height="50" rx="8" fill="#150a0a" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="113" y="200" class="dt" text-anchor="middle" fill="#4ade80">Redis LPUSH + LTRIM</text>
+      <text x="113" y="214" class="ds" text-anchor="middle">Rolling window: last 50 values</text>
+
+      <line x1="113" y1="230" x2="113" y2="260" stroke="#ef4444" stroke-width="2" marker-end="url(#det)"/>
+
+      <!-- Step 3: Z-score -->
+      <rect x="30" y="260" width="165" height="60" rx="8" fill="#150a0a" stroke="#ef4444" stroke-width="2"/>
+      <text x="113" y="280" class="dt" text-anchor="middle" fill="#f87171">Z-score computation</text>
+      <text x="113" y="293" class="ds mono" text-anchor="middle">z = (x − μ) / σ</text>
+      <text x="113" y="307" class="di" text-anchor="middle">Requires ≥10 samples (MIN_SAMPLES)</text>
+
+      <!-- Decision diamond -->
+      <polygon points="113,355 165,325 217,355 165,385" fill="#150a0a" stroke="#ef4444" stroke-width="2"/>
+      <text x="165" y="351" class="dt" text-anchor="middle" fill="#f87171" font-size="9">z &gt; 2.5σ</text>
+      <text x="165" y="363" class="dt" text-anchor="middle" fill="#f87171" font-size="9">threshold?</text>
+      <line x1="113" y1="320" x2="141" y2="338" stroke="#ef4444" stroke-width="2" marker-end="url(#det)"/>
+
+      <!-- NO branch -->
+      <line x1="113" y1="355" x2="30" y2="355" stroke="#4a6280" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#det-gray)"/>
+      <text x="60" y="348" class="di" fill="#4a6280">NO → discard</text>
+      <text x="60" y="358" class="di" fill="#4a6280">~95% of events</text>
+
+      <!-- YES branch -->
+      <line x1="217" y1="355" x2="280" y2="355" stroke="#ef4444" stroke-width="2" marker-end="url(#det)"/>
+      <text x="238" y="347" class="di" fill="#f87171">YES</text>
+
+      <!-- Dedup check -->
+      <rect x="280" y="330" width="165" height="50" rx="8" fill="#150a0a" stroke="#ef4444" stroke-width="1.5"/>
+      <text x="363" y="350" class="dt" text-anchor="middle" fill="#f87171">Redis dedup check</text>
+      <text x="363" y="364" class="ds" text-anchor="middle">SET NX dedup:{svc}:{type}:{metric}</text>
+
+      <!-- Dedup YES branch -->
+      <line x1="363" y1="380" x2="363" y2="410" stroke="#ef4444" stroke-width="2" marker-end="url(#det)"/>
+
+      <!-- Severity determination -->
+      <rect x="280" y="410" width="165" height="50" rx="8" fill="#150a0a" stroke="#ef4444" stroke-width="1.5"/>
+      <text x="363" y="430" class="dt" text-anchor="middle" fill="#f87171">Determine severity</text>
+      <text x="363" y="444" class="ds" text-anchor="middle">Per-metric CRITICAL/HIGH thresholds</text>
+
+      <line x1="363" y1="460" x2="363" y2="480" stroke="#ef4444" stroke-width="2"/>
+
+      <!-- Dedup duplicate branch -->
+      <line x1="363" y1="330" x2="363" y2="310" stroke="#4a6280" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <line x1="363" y1="310" x2="280" y2="310" stroke="#4a6280" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#det-gray)"/>
+      <text x="295" y="303" class="di" fill="#4a6280">duplicate: TTL 5min</text>
+
+      <!-- LLM Classification -->
+      <rect x="490" y="330" width="195" height="65" rx="8" fill="#100818" stroke="#8b5cf6" stroke-width="2"/>
+      <text x="588" y="350" class="dt" text-anchor="middle" fill="#a78bfa">Claude Haiku classify</text>
+      <text x="588" y="364" class="ds" text-anchor="middle">system: "Return ONLY valid JSON:</text>
+      <text x="588" y="376" class="ds" text-anchor="middle">{anomaly_type, severity, description}"</text>
+      <text x="588" y="388" class="di" text-anchor="middle">max_tokens=200, temp=0.1</text>
+
+      <line x1="445" y1="355" x2="490" y2="355" stroke="#ef4444" stroke-width="2" marker-end="url(#det)"/>
+      <line x1="490" y1="380" x2="445" y2="440" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#det)"/>
+
+      <!-- Postgres insert -->
+      <rect x="280" y="480" width="165" height="0" rx="8"/><!-- placeholder -->
+
+      <!-- LLM fallback -->
+      <rect x="490" y="410" width="195" height="50" rx="8" fill="#0a1a0a" stroke="#22c55e" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="588" y="430" class="dt" text-anchor="middle" fill="#4ade80" font-size="9">Fallback (LLM unavailable)</text>
+      <text x="588" y="444" class="ds" text-anchor="middle">if σ&gt;3.0 → severity=HIGH, default type</text>
+      <text x="588" y="456" class="di" text-anchor="middle">Statistical detection never stops</text>
+
+      <!-- Publish + DB -->
+      <rect x="700" y="260" width="180" height="130" rx="8" fill="#091422" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="790" y="282" class="dt" text-anchor="middle" fill="#93c5fd">Output</text>
+      <text x="790" y="300" class="ds" text-anchor="middle">INSERT incidents (Postgres)</text>
+      <text x="790" y="314" class="ds" text-anchor="middle">log_agent_event (audit)</text>
+      <text x="700" y="320" width="180" height="1"/>
+      <text x="790" y="334" class="dt" text-anchor="middle" fill="#f87171">anomalies.detected</text>
+      <text x="790" y="348" class="ds" text-anchor="middle">AnomalyDetectedEvent</text>
+      <text x="790" y="362" class="ds" text-anchor="middle">incident_id, anomaly_type,</text>
+      <text x="790" y="375" class="ds" text-anchor="middle">severity, sigma, p50/p95/p99</text>
+
+      <line x1="685" y1="395" x2="700" y2="375" stroke="#ef4444" stroke-width="2" marker-end="url(#det)"/>
+
+      <!-- Severity thresholds legend -->
+      <rect x="30" y="420" width="240" height="120" rx="8" fill="rgba(22,35,64,.5)" stroke="#1e3050" stroke-width="1"/>
+      <text x="150" y="438" class="dt" text-anchor="middle" fill="#94a3b8">SIGMA THRESHOLDS</text>
+      <text x="40" y="456" class="ds" fill="#4a6280">metric</text>
+      <text x="130" y="456" class="ds" fill="#f97316">HIGH</text>
+      <text x="185" y="456" class="ds" fill="#ef4444">CRITICAL</text>
+      <line x1="40" y1="460" x2="260" y2="460" stroke="#162340" stroke-width="1"/>
+      <text x="40" y="473" class="ds">latency_p99_ms</text><text x="130" y="473" class="ds" fill="#fb923c">3.0σ</text><text x="185" y="473" class="ds" fill="#f87171">5.0σ</text>
+      <text x="40" y="486" class="ds">error_rate_percent</text><text x="130" y="486" class="ds" fill="#fb923c">3.5σ</text><text x="185" y="486" class="ds" fill="#f87171">6.0σ</text>
+      <text x="40" y="499" class="ds">cpu_percent</text><text x="130" y="499" class="ds" fill="#fb923c">3.0σ</text><text x="185" y="499" class="ds" fill="#f87171">5.5σ</text>
+      <text x="40" y="512" class="ds">memory_percent</text><text x="130" y="512" class="ds" fill="#fb923c">3.0σ</text><text x="185" y="512" class="ds" fill="#f87171">5.0σ</text>
+      <text x="40" y="525" class="ds">db_connections</text><text x="130" y="525" class="ds" fill="#fb923c">2.8σ</text><text x="185" y="525" class="ds" fill="#f87171">4.0σ</text>
+    </svg>
+    <div class="diagram-caption">Figure 5.1 — Detection Agent internal flow. Only ~5% of metric events exceed the 2.5σ threshold and proceed to LLM classification. Redis dedup prevents re-processing the same anomaly within the 5-minute TTL window.</div>
+  </div>
+
+  <h3>Z-Score Algorithm</h3>
+  <div class="code-block">
+<span class="k">def</span> <span class="f">compute_zscore</span>(values: list[float], new_value: float) -> tuple[float, float, float]:
+    <span class="c"># Returns (zscore, mean, std). Returns (0, new_value, 0) if insufficient samples.</span>
+    <span class="k">if</span> len(values) &lt; MIN_SAMPLES:  <span class="c"># MIN_SAMPLES = 10</span>
+        <span class="k">return</span> <span class="n">0.0</span>, new_value, <span class="n">0.0</span>
+    mean = sum(values) / len(values)
+    variance = sum((v - mean) ** <span class="n">2</span> <span class="k">for</span> v <span class="k">in</span> values) / len(values)
+    std = math.sqrt(variance) <span class="k">if</span> variance > <span class="n">0</span> <span class="k">else</span> <span class="n">0.0</span>
+    <span class="k">if</span> std &lt; <span class="n">1e-9</span>:  <span class="c"># constant metric — never anomalous</span>
+        <span class="k">return</span> <span class="n">0.0</span>, mean, std
+    <span class="k">return</span> (new_value - mean) / std, mean, std
+
+<span class="c"># Rolling baseline: LPUSH → LTRIM to last 50 values (BASELINE_WINDOW)</span>
+<span class="c"># Key: metric:{service}:{metric_name}</span>
+<span class="c"># Current value excluded from baseline to avoid self-comparison bias</span>
+zscore, mean, std = compute_zscore(history[<span class="n">1</span>:], value)  <span class="c"># history[0] is current value</span></div>
+
+  <h3>Log Anomaly Detection (Secondary Path)</h3>
+  <p>In addition to metric-based detection, the Detection Agent monitors <code>raw.logs</code> for error bursts. If a service emits ≥5 ERROR/FATAL log entries within 60 seconds (tracked via <code>INCR error_count:{service}</code> with 60s TTL in Redis), it fires an <code>ERROR_RATE_SPIKE</code> anomaly with severity HIGH/CRITICAL. This handles cases where the error rate metric hasn't yet been scraped but the logs are already showing failures.</p>
+</div>
+</section>
+
+<!-- ─── SECTION 6: Correlation Agent ──────────────────────────────────────── -->
+<section id="correlation">
+<div class="container">
+  <div class="section-tag" style="background:rgba(249,115,22,.1);color:var(--orange2)">Section 6</div>
+  <h2>Correlation Agent — Deep Dive</h2>
+  <p>The Correlation Agent converts an isolated anomaly signal into a rich incident context. It does this by replaying 30 minutes of Kafka history, querying the deployment database, checking downstream services for cascade effects, and assembling four types of correlation signals.</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 950 400" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:400px">
+      <defs>
+        <marker id="cor" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#f97316"/></marker>
+        <marker id="cor-gray" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#4a6280"/></marker>
+      </defs>
+      <style>.co{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#e2e8f0;font-size:10px;font-weight:700}
+      .cs{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#94a3b8;font-size:9px}
+      .ci{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#4a6280;font-size:8px}</style>
+
+      <!-- Input -->
+      <rect x="10" y="170" width="150" height="50" rx="7" fill="#091422" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="85" y="190" class="co" text-anchor="middle" fill="#93c5fd">anomalies.detected</text>
+      <text x="85" y="204" class="cs" text-anchor="middle">AnomalyDetectedEvent</text>
+      <text x="85" y="216" class="ci" text-anchor="middle">(Kafka consumer, group: correlation-agent)</text>
+
+      <!-- Check active incident -->
+      <line x1="160" y1="195" x2="200" y2="195" stroke="#f97316" stroke-width="2" marker-end="url(#cor)"/>
+      <rect x="200" y="170" width="150" height="50" rx="7" fill="#180d00" stroke="#f97316" stroke-width="1.5"/>
+      <text x="275" y="190" class="co" text-anchor="middle" fill="#fb923c">Active incident check</text>
+      <text x="275" y="204" class="cs" text-anchor="middle">Redis GET active_incident:{svc}</text>
+      <text x="275" y="216" class="ci" text-anchor="middle">→ suppress if already open (30min TTL)</text>
+
+      <!-- Fan out to 4 parallel checks -->
+      <line x1="350" y1="195" x2="390" y2="195" stroke="#f97316" stroke-width="2"/>
+
+      <!-- 4 data collection boxes in a column on the right -->
+      <!-- Kafka replay -->
+      <line x1="390" y1="195" x2="390" y2="50" stroke="#f97316" stroke-width="1.5"/>
+      <line x1="390" y1="50" x2="420" y2="50" stroke="#f97316" stroke-width="1.5" marker-end="url(#cor)"/>
+      <rect x="420" y="25" width="200" height="55" rx="7" fill="#120a2a" stroke="#a855f7" stroke-width="1.5"/>
+      <text x="520" y="44" class="co" text-anchor="middle" fill="#c084fc">Kafka replay_window()</text>
+      <text x="520" y="57" class="cs" text-anchor="middle">raw.metrics (30min window)</text>
+      <text x="520" y="68" class="ci" text-anchor="middle">service + dependencies, max 2000 msgs</text>
+
+      <!-- Deployment check -->
+      <line x1="390" y1="195" x2="390" y2="130" stroke="#f97316" stroke-width="1.5"/>
+      <line x1="390" y1="130" x2="420" y2="130" stroke="#f97316" stroke-width="1.5" marker-end="url(#cor)"/>
+      <rect x="420" y="105" width="200" height="55" rx="7" fill="#180d00" stroke="#f97316" stroke-width="1.5"/>
+      <text x="520" y="124" class="co" text-anchor="middle" fill="#fb923c">Deployment correlation</text>
+      <text x="520" y="137" class="cs" text-anchor="middle">Postgres: recent deployments (60min)</text>
+      <text x="520" y="148" class="ci" text-anchor="middle">confidence = 1.0 − (delta_min / 60)</text>
+
+      <!-- Cascade detection -->
+      <line x1="390" y1="195" x2="390" y2="210" stroke="#f97316" stroke-width="1.5"/>
+      <line x1="390" y1="210" x2="420" y2="210" stroke="#f97316" stroke-width="1.5" marker-end="url(#cor)"/>
+      <rect x="420" y="185" width="200" height="55" rx="7" fill="#150a0a" stroke="#ef4444" stroke-width="1.5"/>
+      <text x="520" y="204" class="co" text-anchor="middle" fill="#f87171">Cascade detection</text>
+      <text x="520" y="218" class="cs" text-anchor="middle">Check downstreams via service_registry</text>
+      <text x="520" y="229" class="ci" text-anchor="middle">error_rate_percent &gt; 5.0 in replay window</text>
+
+      <!-- Log errors -->
+      <line x1="390" y1="195" x2="390" y2="290" stroke="#f97316" stroke-width="1.5"/>
+      <line x1="390" y1="290" x2="420" y2="290" stroke="#f97316" stroke-width="1.5" marker-end="url(#cor)"/>
+      <rect x="420" y="265" width="200" height="55" rx="7" fill="#0a1508" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="520" y="284" class="co" text-anchor="middle" fill="#4ade80">Log error replay</text>
+      <text x="520" y="298" class="cs" text-anchor="middle">raw.logs (30min window)</text>
+      <text x="520" y="309" class="ci" text-anchor="middle">Extract ERROR/FATAL messages</text>
+
+      <!-- Merge arrows to signal builder -->
+      <line x1="620" y1="50" x2="680" y2="195" stroke="#f97316" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#cor)"/>
+      <line x1="620" y1="130" x2="680" y2="195" stroke="#f97316" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#cor)"/>
+      <line x1="620" y1="210" x2="680" y2="195" stroke="#f97316" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#cor)"/>
+      <line x1="620" y1="290" x2="680" y2="195" stroke="#f97316" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#cor)"/>
+
+      <!-- Signal builder -->
+      <rect x="680" y="160" width="165" height="75" rx="7" fill="#180d00" stroke="#f97316" stroke-width="2"/>
+      <text x="763" y="180" class="co" text-anchor="middle" fill="#fb923c">Build signals</text>
+      <text x="763" y="194" class="cs" text-anchor="middle">TEMPORAL_PROXIMITY</text>
+      <text x="763" y="206" class="cs" text-anchor="middle">DEPENDENCY_CASCADE</text>
+      <text x="763" y="218" class="cs" text-anchor="middle">RESOURCE_CONTENTION</text>
+      <text x="763" y="230" class="cs" text-anchor="middle">ERROR_AMPLIFICATION</text>
+
+      <!-- Output -->
+      <line x1="845" y1="195" x2="880" y2="195" stroke="#f97316" stroke-width="2" marker-end="url(#cor)"/>
+      <rect x="880" y="160" width="60" height="75" rx="7" fill="#12201a" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="910" y="186" class="co" text-anchor="middle" fill="#4ade80" font-size="9">incidents</text>
+      <text x="910" y="199" class="co" text-anchor="middle" fill="#4ade80" font-size="9">.opened</text>
+      <text x="910" y="214" class="cs" text-anchor="middle" font-size="8">+Redis lock</text>
+      <text x="910" y="226" class="cs" text-anchor="middle" font-size="8">30min TTL</text>
+
+      <!-- Signal strength legend -->
+      <rect x="10" y="330" width="600" height="60" rx="8" fill="rgba(22,35,64,.5)" stroke="#1e3050" stroke-width="1"/>
+      <text x="20" y="348" class="co" fill="#94a3b8">SIGNAL STRENGTH FORMULAS</text>
+      <text x="20" y="364" class="cs">TEMPORAL_PROXIMITY:</text><text x="145" y="364" class="cs" fill="#fb923c">confidence = 1.0 − (delta_min / 60.0)  [+0.15 if known_risks]</text>
+      <text x="20" y="378" class="cs">DEPENDENCY_CASCADE:</text><text x="149" y="378" class="cs" fill="#f87171">strength = min(0.9, 0.5 + 0.1 × cascade_count)</text>
+      <text x="20" y="392" class="cs">RESOURCE_CONTENTION:</text><text x="155" y="392" class="cs" fill="#facc15">fixed 0.7  [if db_connections peak &gt; 80]</text>
+      <text x="320" y="378" class="cs">ERROR_AMPLIFICATION:</text><text x="460" y="378" class="cs" fill="#4ade80">min(0.9, 0.4 + 0.05 × error_count)</text>
+    </svg>
+    <div class="diagram-caption">Figure 6.1 — Correlation Agent flow. All four data collection operations run in parallel (Python threads). The Redis active_incident lock prevents duplicate incidents for the same service within a 30-minute window, which is how cascade failures are grouped under a single incident ID.</div>
+  </div>
+</div>
+</section>
+
+<!-- ─── SECTION 7: Investigation Agent + Confidence Scoring ────────────────── -->
+<section id="investigation">
+<div class="container">
+  <div class="section-tag" style="background:rgba(234,179,8,.1);color:var(--yellow2)">Section 7</div>
+  <h2>Investigation Agent — Parallel KR + Confidence Scoring</h2>
+  <p>The Investigation Agent is the system's primary reasoning engine. It orchestrates 5 parallel Knowledge Retrieval requests, assembles a rich context document, runs a tool-use LLM loop for chain-of-thought RCA, then scores each hypothesis using a deterministic formula.</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1000 450" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:450px">
+      <defs>
+        <marker id="inv" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#eab308"/></marker>
+        <marker id="inv-g" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#22c55e"/></marker>
+      </defs>
+      <style>.it{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#e2e8f0;font-size:10px;font-weight:700}
+      .is{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#94a3b8;font-size:9px}
+      .ii{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#4a6280;font-size:8px}</style>
+
+      <!-- Input: incidents.opened -->
+      <rect x="10" y="195" width="120" height="45" rx="7" fill="#091422" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="70" y="213" class="it" text-anchor="middle" fill="#93c5fd" font-size="9">incidents.opened</text>
+      <text x="70" y="227" class="is" text-anchor="middle">IncidentOpenedEvent</text>
+      <text x="70" y="238" class="ii" text-anchor="middle">correlation_signals included</text>
+
+      <!-- Fan-out to 5 KR requests -->
+      <line x1="130" y1="218" x2="165" y2="218" stroke="#eab308" stroke-width="2"/>
+      <line x1="165" y1="218" x2="165" y2="30" stroke="#eab308" stroke-width="1.5"/>
+      <line x1="165" y1="218" x2="165" y2="100" stroke="#eab308" stroke-width="1.5"/>
+      <line x1="165" y1="218" x2="165" y2="170" stroke="#eab308" stroke-width="1.5"/>
+      <line x1="165" y1="218" x2="165" y2="240" stroke="#eab308" stroke-width="1.5"/>
+      <line x1="165" y1="218" x2="165" y2="310" stroke="#eab308" stroke-width="1.5"/>
+      <text x="165" y="415" class="it" text-anchor="middle" fill="#facc15" font-size="9">ThreadPoolExecutor</text>
+      <text x="165" y="428" class="is" text-anchor="middle">max_workers=5 concurrent KR requests</text>
+
+      <!-- 5 KR request boxes -->
+      <line x1="165" y1="30" x2="195" y2="30" stroke="#22c55e" stroke-width="1.5" marker-end="url(#inv-g)"/>
+      <rect x="195" y="10" width="185" height="45" rx="6" fill="#0a1a0a" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="288" y="28" class="it" text-anchor="middle" fill="#4ade80" font-size="9">INCIDENT_SIMILARITY</text>
+      <text x="288" y="42" class="is" text-anchor="middle">Qdrant: incidents coll · top 20→5</text>
+      <text x="288" y="53" class="ii" text-anchor="middle">filter: env=production, resolved=true</text>
+
+      <line x1="165" y1="100" x2="195" y2="100" stroke="#22c55e" stroke-width="1.5" marker-end="url(#inv-g)"/>
+      <rect x="195" y="80" width="185" height="45" rx="6" fill="#0a1a0a" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="288" y="98" class="it" text-anchor="middle" fill="#4ade80" font-size="9">RUNBOOK_LOOKUP</text>
+      <text x="288" y="112" class="is" text-anchor="middle">Qdrant: runbooks coll · top 10→5</text>
+      <text x="288" y="123" class="ii" text-anchor="middle">boost: +0.10 if anomaly_type matches</text>
+
+      <line x1="165" y1="170" x2="195" y2="170" stroke="#22c55e" stroke-width="1.5" marker-end="url(#inv-g)"/>
+      <rect x="195" y="150" width="185" height="45" rx="6" fill="#0a1a0a" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="288" y="168" class="it" text-anchor="middle" fill="#4ade80" font-size="9">ARCHITECTURE_CONTEXT</text>
+      <text x="288" y="182" class="is" text-anchor="middle">Qdrant: architecture coll · exact svc</text>
+      <text x="288" y="193" class="ii" text-anchor="middle">filter: service_name={affected}</text>
+
+      <line x1="165" y1="240" x2="195" y2="240" stroke="#22c55e" stroke-width="1.5" marker-end="url(#inv-g)"/>
+      <rect x="195" y="220" width="185" height="45" rx="6" fill="#0a1a0a" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="288" y="238" class="it" text-anchor="middle" fill="#4ade80" font-size="9">DEPLOYMENT_NOTES</text>
+      <text x="288" y="252" class="is" text-anchor="middle">Qdrant: deployments coll · ±2h window</text>
+      <text x="288" y="263" class="ii" text-anchor="middle">filter: service + deployed_at_epoch range</text>
+
+      <line x1="165" y1="310" x2="195" y2="310" stroke="#22c55e" stroke-width="1.5" marker-end="url(#inv-g)"/>
+      <rect x="195" y="290" width="185" height="45" rx="6" fill="#0a1a0a" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="288" y="308" class="it" text-anchor="middle" fill="#4ade80" font-size="9">POSTMORTEM_PATTERNS</text>
+      <text x="288" y="322" class="is" text-anchor="middle">Qdrant: postmortems coll · top 5</text>
+      <text x="288" y="333" class="ii" text-anchor="middle">recurring systemic contributing factors</text>
+
+      <!-- All 5 converge to context assembler -->
+      <line x1="380" y1="30" x2="430" y2="200" stroke="#22c55e" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#inv-g)"/>
+      <line x1="380" y1="100" x2="430" y2="200" stroke="#22c55e" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#inv-g)"/>
+      <line x1="380" y1="170" x2="430" y2="200" stroke="#22c55e" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#inv-g)"/>
+      <line x1="380" y1="240" x2="430" y2="200" stroke="#22c55e" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#inv-g)"/>
+      <line x1="380" y1="310" x2="430" y2="200" stroke="#22c55e" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#inv-g)"/>
+
+      <!-- Token budget box -->
+      <rect x="395" y="170" width="155" height="65" rx="7" fill="#091422" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="473" y="188" class="it" text-anchor="middle" fill="#93c5fd" font-size="9">Token Budget (4096)</text>
+      <text x="473" y="202" class="is" text-anchor="middle">Priority: incidents &gt; runbooks</text>
+      <text x="473" y="215" class="is" text-anchor="middle">&gt; architecture &gt; deployments</text>
+      <text x="473" y="228" class="is" text-anchor="middle">&gt; postmortems → truncate</text>
+
+      <!-- LLM tool-use loop -->
+      <line x1="550" y1="200" x2="580" y2="200" stroke="#eab308" stroke-width="2" marker-end="url(#inv)"/>
+      <rect x="580" y="150" width="200" height="130" rx="7" fill="#17150a" stroke="#eab308" stroke-width="2"/>
+      <text x="680" y="172" class="it" text-anchor="middle" fill="#facc15">Claude Sonnet tool-use</text>
+      <text x="680" y="188" class="is" text-anchor="middle">system: "expert SRE analyst"</text>
+      <text x="680" y="202" class="is" text-anchor="middle">max_tokens=4096 · max_rounds=8</text>
+      <text x="680" y="218" class="is" text-anchor="middle">Tools: get_incident_context</text>
+      <text x="680" y="232" class="is" text-anchor="middle">        submit_rca</text>
+      <text x="680" y="248" class="ii" text-anchor="middle">Chain-of-thought reasoning over</text>
+      <text x="680" y="260" class="ii" text-anchor="middle">assembled incident + knowledge context</text>
+      <text x="680" y="272" class="ii" text-anchor="middle">Returns 2-4 hypotheses ranked by evidence</text>
+
+      <!-- Confidence scoring -->
+      <line x1="780" y1="215" x2="815" y2="215" stroke="#eab308" stroke-width="2" marker-end="url(#inv)"/>
+      <rect x="815" y="160" width="175" height="120" rx="7" fill="#100818" stroke="#8b5cf6" stroke-width="1.5"/>
+      <text x="903" y="180" class="it" text-anchor="middle" fill="#a78bfa" font-size="9">Confidence scoring</text>
+      <text x="903" y="196" class="is" text-anchor="middle">base = 0.50</text>
+      <text x="903" y="210" class="is" text-anchor="middle" fill="#4ade80">+0.20 deployment corr</text>
+      <text x="903" y="224" class="is" text-anchor="middle" fill="#4ade80">+0.15 similar incidents</text>
+      <text x="903" y="238" class="is" text-anchor="middle" fill="#4ade80">+0.10 ≥3 incidents</text>
+      <text x="903" y="252" class="is" text-anchor="middle" fill="#4ade80">+0.05 runbook match</text>
+      <text x="903" y="266" class="is" text-anchor="middle" fill="#f87171">−0.15 no similar incidents</text>
+      <text x="903" y="276" class="ii" text-anchor="middle" fill="#f87171">−0.10 &gt;2 competing hyp</text>
+
+      <!-- Output -->
+      <line x1="903" y1="280" x2="903" y2="310" stroke="#eab308" stroke-width="2" marker-end="url(#inv)"/>
+      <rect x="815" y="310" width="175" height="50" rx="7" fill="#12201a" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="903" y="330" class="it" text-anchor="middle" fill="#4ade80">rca.completed</text>
+      <text x="903" y="345" class="is" text-anchor="middle">RCACompletedEvent</text>
+      <text x="903" y="358" class="ii" text-anchor="middle">candidates sorted by confidence</text>
+    </svg>
+    <div class="diagram-caption">Figure 7.1 — Investigation Agent flow. 5 KR requests fire in parallel via ThreadPoolExecutor, results are assembled with token budget enforcement, then Claude Sonnet runs a tool-use loop that calls get_incident_context and submit_rca to finalize the hypothesis list.</div>
+  </div>
+
+  <h3>Confidence Scoring Formula</h3>
+  <p>Confidence is computed deterministically from observable evidence — not from LLM natural-language claims. This allows the on-call engineer to see exactly why the system is or isn't confident.</p>
+  <div class="formula">
+<span class="base">base = 0.50</span>  <span class="rule"># epistemic prior: unknown cause</span>
+
+<span class="pos">+0.20</span>  <span class="rule">if deployment_correlated</span>
+<span class="pos">+0.15</span>  <span class="rule">if len(similar_incidents) > 0</span>
+<span class="pos">+0.10</span>  <span class="rule">if len(similar_incidents) >= 3  # strong historical signal</span>
+<span class="pos">+0.05</span>  <span class="rule">if has_runbook</span>
+<span class="pos">+0.05</span>  <span class="rule">if len(evidence) >= 4</span>
+<span class="neg">−0.15</span>  <span class="rule">if not similar_incidents</span>
+<span class="neg">−0.10</span>  <span class="rule">if competing_hypothesis_count > 2  # ambiguous signal</span>
+
+<span class="base">final = clamp(base + modifiers, 0.0, 1.0)</span>
+
+<span class="rule"># Confidence interpretation:</span>
+<span class="rule"># ≥ 0.80 → rollback deployment immediately</span>
+<span class="rule"># 0.60–0.79 → follow runbook, monitor closely</span>
+<span class="rule"># 0.40–0.59 → investigate manually alongside AI suggestion</span>
+<span class="rule"># ≤ 0.39 → insufficient evidence — escalate to senior engineer</span></div>
+</div>
+</section>
+
+<!-- ─── SECTION 8: Knowledge Base Architecture ─────────────────────────────── -->
+<section id="knowledge-base">
+<div class="container">
+  <div class="section-tag" style="background:rgba(99,102,241,.1);color:var(--indigo2)">Section 8</div>
+  <h2>Knowledge Base Architecture (RAG Layer)</h2>
+  <p>The RAG layer uses Qdrant with 5 purpose-built collections. The design is non-obvious: incidents are chunked into 4 semantic types per incident, enabling precise retrieval of <em>symptoms</em> independent of root cause, which is the pattern you want when a new incident presents similar symptoms to a historically different root cause.</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1050 350" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:350px">
+      <style>.kb{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#e2e8f0;font-size:10px;font-weight:700}
+      .ks{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#94a3b8;font-size:9px}
+      .ki{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#4a6280;font-size:8px}</style>
+
+      <!-- incidents collection -->
+      <rect x="10" y="10" width="190" height="230" rx="8" fill="#150a0a" stroke="#ef4444" stroke-width="2"/>
+      <rect x="10" y="10" width="190" height="24" rx="8" fill="rgba(239,68,68,.2)"/>
+      <text x="105" y="28" class="kb" text-anchor="middle" fill="#f87171">incidents</text>
+      <text x="105" y="46" class="ks" text-anchor="middle">50 incidents × 4 chunks = 200 vectors</text>
+      <text x="105" y="58" class="ks" text-anchor="middle">384-dim · cosine · HNSW</text>
+      <text x="20" y="74" class="kb" fill="#94a3b8" font-size="9">Chunk types (per incident):</text>
+      <rect x="20" y="80" width="170" height="20" rx="4" fill="rgba(239,68,68,.1)" stroke="#ef4444" stroke-width=".8"/>
+      <text x="105" y="93" class="ks" text-anchor="middle">summary — overall incident text</text>
+      <rect x="20" y="106" width="170" height="20" rx="4" fill="rgba(249,115,22,.1)" stroke="#f97316" stroke-width=".8"/>
+      <text x="105" y="119" class="ks" text-anchor="middle">symptoms — observed metric values</text>
+      <rect x="20" y="132" width="170" height="20" rx="4" fill="rgba(234,179,8,.1)" stroke="#eab308" stroke-width=".8"/>
+      <text x="105" y="145" class="ks" text-anchor="middle">root_cause — trigger + explanation</text>
+      <rect x="20" y="158" width="170" height="20" rx="4" fill="rgba(34,197,94,.1)" stroke="#22c55e" stroke-width=".8"/>
+      <text x="105" y="171" class="ks" text-anchor="middle">resolution_steps — how it was fixed</text>
+      <text x="20" y="196" class="kb" fill="#94a3b8" font-size="9">Filters: env=production, resolved=true</text>
+      <text x="20" y="208" class="ki">Dedup: cross-encoder reranker</text>
+      <text x="20" y="220" class="ki">ms-marco-MiniLM-L-6-v2 (local)</text>
+      <text x="20" y="232" class="ki">Recall: 60%→85% top-3 precision</text>
+
+      <!-- runbooks collection -->
+      <rect x="215" y="10" width="190" height="200" rx="8" fill="#091a18" stroke="#14b8a6" stroke-width="2"/>
+      <rect x="215" y="10" width="190" height="24" rx="8" fill="rgba(20,184,166,.2)"/>
+      <text x="310" y="28" class="kb" text-anchor="middle" fill="#2dd4bf">runbooks</text>
+      <text x="310" y="46" class="ks" text-anchor="middle">9 runbooks × ~5 chunks = ~45 vectors</text>
+      <text x="310" y="58" class="ks" text-anchor="middle">384-dim · cosine</text>
+      <text x="225" y="74" class="kb" fill="#94a3b8" font-size="9">Available runbooks:</text>
+      <text x="225" y="88" class="ki">cpu-saturation.md</text>
+      <text x="225" y="99" class="ki">database-connection-exhaustion.md</text>
+      <text x="225" y="110" class="ki">dependency-outage.md</text>
+      <text x="225" y="121" class="ki">deployment-rollback.md</text>
+      <text x="225" y="132" class="ki">error-rate-spike.md</text>
+      <text x="225" y="143" class="ki">high-latency-api.md</text>
+      <text x="225" y="154" class="ki">kafka-consumer-lag.md</text>
+      <text x="225" y="165" class="ki">memory-leak.md</text>
+      <text x="225" y="176" class="ki">network-partition.md</text>
+      <text x="225" y="192" class="ks">Score boost: +0.15 svc match</text>
+      <text x="225" y="204" class="ks">+0.10 anomaly_type match</text>
+
+      <!-- architecture collection -->
+      <rect x="420" y="10" width="185" height="180" rx="8" fill="#091422" stroke="#3b82f6" stroke-width="2"/>
+      <rect x="420" y="10" width="185" height="24" rx="8" fill="rgba(59,130,246,.2)"/>
+      <text x="513" y="28" class="kb" text-anchor="middle" fill="#93c5fd">architecture</text>
+      <text x="513" y="46" class="ks" text-anchor="middle">6 service docs · 6 vectors</text>
+      <text x="513" y="58" class="ks" text-anchor="middle">384-dim · cosine</text>
+      <text x="430" y="74" class="kb" fill="#94a3b8" font-size="9">Per-service payload:</text>
+      <text x="430" y="88" class="ki">service_name, team_owner</text>
+      <text x="430" y="99" class="ki">criticality (P0/P1)</text>
+      <text x="430" y="110" class="ki">sla_p99_latency_ms</text>
+      <text x="430" y="121" class="ki">sla_error_rate_pct</text>
+      <text x="430" y="132" class="ki">upstream_services[]</text>
+      <text x="430" y="143" class="ki">downstream_services[]</text>
+      <text x="430" y="154" class="ki">known_failure_modes[]</text>
+      <text x="430" y="165" class="ki">on_call_rotation email</text>
+      <text x="430" y="178" class="ks">Filter: service_name exact match</text>
+
+      <!-- deployments collection -->
+      <rect x="620" y="10" width="195" height="175" rx="8" fill="#17150a" stroke="#eab308" stroke-width="2"/>
+      <rect x="620" y="10" width="195" height="24" rx="8" fill="rgba(234,179,8,.2)"/>
+      <text x="718" y="28" class="kb" text-anchor="middle" fill="#facc15">deployments</text>
+      <text x="718" y="46" class="ks" text-anchor="middle">30 deployment records · 30 vectors</text>
+      <text x="718" y="58" class="ks" text-anchor="middle">384-dim · cosine</text>
+      <text x="630" y="74" class="kb" fill="#94a3b8" font-size="9">Per-deployment payload:</text>
+      <text x="630" y="88" class="ki">service_name, version</text>
+      <text x="630" y="99" class="ki">deployed_by (user/pipeline)</text>
+      <text x="630" y="110" class="ki">change_type (CODE/CONFIG/DEP/INFRA)</text>
+      <text x="630" y="121" class="ki">description, git_sha</text>
+      <text x="630" y="132" class="ki">known_risks[] — key field!</text>
+      <text x="630" y="143" class="ki">deployed_at_epoch (for range filter)</text>
+      <text x="630" y="158" class="ks">Range filter: service + time window ±2h</text>
+      <text x="630" y="170" class="ks">Fallback: service-only if range fails</text>
+
+      <!-- postmortems collection -->
+      <rect x="830" y="10" width="210" height="180" rx="8" fill="#100a1e" stroke="#8b5cf6" stroke-width="2"/>
+      <rect x="830" y="10" width="210" height="24" rx="8" fill="rgba(139,92,246,.2)"/>
+      <text x="935" y="28" class="kb" text-anchor="middle" fill="#a78bfa">postmortems</text>
+      <text x="935" y="46" class="ks" text-anchor="middle">7 postmortems · 7 vectors</text>
+      <text x="935" y="58" class="ks" text-anchor="middle">384-dim · cosine</text>
+      <text x="840" y="74" class="kb" fill="#94a3b8" font-size="9">Per-postmortem payload:</text>
+      <text x="840" y="88" class="ki">incident_id, service</text>
+      <text x="840" y="99" class="ki">root_cause_category</text>
+      <text x="840" y="110" class="ki">contributing_factors (key field)</text>
+      <text x="840" y="121" class="ki">preventative_actions</text>
+      <text x="840" y="132" class="ki">mttr_minutes</text>
+      <text x="840" y="143" class="ki">severity, anomaly_type</text>
+      <text x="840" y="160" class="ks">Query: recurring systemic factors</text>
+      <text x="840" y="172" class="ks">Self-improving: new postmortems indexed</text>
+
+      <!-- Token budget flow -->
+      <rect x="10" y="255" width="1030" height="85" rx="8" fill="rgba(22,35,64,.5)" stroke="#1e3050" stroke-width="1"/>
+      <text x="20" y="272" class="kb" fill="#94a3b8">TOKEN BUDGET ENFORCEMENT (4096 tokens total returned to Investigation Agent)</text>
+      <text x="20" y="290" class="ks">Priority order: incidents → runbooks → architecture → deployments → postmortems</text>
+      <text x="20" y="306" class="ks">Each chunk counted at ~4 chars/token. Once budget fills, lower-priority chunks are dropped.</text>
+      <text x="20" y="322" class="ks">Purpose: prevent token explosion in the LLM reasoning loop while preserving the highest-signal information.</text>
+      <text x="550" y="290" class="ks" fill="#4a6280">KRResponse.total_tokens returned for observability</text>
+      <text x="550" y="306" class="ks" fill="#4a6280">Each chunk carries its Qdrant relevance score (0.0–1.0)</text>
+      <text x="550" y="322" class="ks" fill="#4a6280">Investigation Agent shows top 3 chunks per section in assembled context</text>
+    </svg>
+    <div class="diagram-caption">Figure 8.1 — Five Qdrant collections with their schema, chunk counts, filter predicates, and token budget priority order. The incidents collection splits each historical incident into 4 semantic chunk types, enabling precise symptom-matching independent of root cause.</div>
+  </div>
+
+  <h3>Why Not pgvector?</h3>
+  <div class="two-col" style="gap:1rem">
+    <div class="card">
+      <h3 style="color:var(--indigo2)">Qdrant advantages for this use case</h3>
+      <ul>
+        <li><strong>Hybrid filtering</strong> — Combined vector similarity + metadata predicates in a single query (e.g., <code>env=production AND resolved=true AND service_name=payment-service</code>). pgvector requires post-filter which wastes the ANN index.</li>
+        <li><strong>HNSW tuning</strong> — <code>m=16, ef_construct=100</code> directly controls recall/latency tradeoff. pgvector exposes fewer knobs.</li>
+        <li><strong>Schema-free payloads</strong> — Adding new metadata fields to any collection requires no ALTER TABLE, just write the new key in the payload dict.</li>
+        <li><strong>Docker-native</strong> — Full-featured local instance with zero configuration. Not a cloud dependency.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--indigo2)">Embedding model choice</h3>
+      <p><code>all-MiniLM-L6-v2</code> (384-dim, local) vs <code>text-embedding-3-large</code> (3072-dim, OpenAI API):</p>
+      <ul>
+        <li>MiniLM runs locally — no additional API key, zero per-call cost, no network hop</li>
+        <li>Sufficient for domain-specific operational text (incidents all share vocabulary and structure)</li>
+        <li>384-dim HNSW index is 8× smaller than 3072-dim — faster ANN lookup</li>
+        <li>To switch: set <code>EMBEDDING_MODEL=text-embedding-3-large</code> in <code>.env</code></li>
+      </ul>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ─── SECTION 9: Data Layer ──────────────────────────────────────────────── -->
+<section id="data-layer">
+<div class="container">
+  <div class="section-tag" style="background:rgba(59,130,246,.1);color:var(--blue2)">Section 9</div>
+  <h2>Data Layer — PostgreSQL Schema & Redis Patterns</h2>
+
+  <div class="two-col">
+    <div>
+      <h3>PostgreSQL Schema (7 tables, 2 views)</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 480 520" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:520px">
+          <defs>
+            <marker id="fk" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#3b82f6"/></marker>
+          </defs>
+          <style>.pt{font-family:'Courier New',monospace;fill:#e2e8f0;font-size:9px;font-weight:700}
+          .pc{font-family:'Courier New',monospace;fill:#94a3b8;font-size:8px}
+          .pk{font-family:'Courier New',monospace;fill:#facc15;font-size:8px}
+          .pf{font-family:'Courier New',monospace;fill:#60a5fa;font-size:8px}
+          .pj{font-family:'Courier New',monospace;fill:#a78bfa;font-size:8px}</style>
+
+          <!-- incidents table (central) -->
+          <rect x="10" y="10" width="220" height="270" rx="6" fill="#091422" stroke="#3b82f6" stroke-width="2"/>
+          <rect x="10" y="10" width="220" height="20" rx="6" fill="rgba(59,130,246,.3)"/>
+          <text x="120" y="25" class="pt" text-anchor="middle" fill="#93c5fd">incidents</text>
+          <text x="20" y="42" class="pk">id UUID PK</text>
+          <text x="20" y="54" class="pc">severity VARCHAR(20) CHECK</text>
+          <text x="20" y="66" class="pc">anomaly_type VARCHAR(60)</text>
+          <text x="20" y="78" class="pc">affected_services TEXT[]</text>
+          <text x="20" y="90" class="pc">status VARCHAR(30) CHECK</text>
+          <text x="20" y="102" class="pc">detection_time TIMESTAMPTZ</text>
+          <text x="20" y="114" class="pc">resolution_time TIMESTAMPTZ</text>
+          <text x="20" y="126" class="pk">mttr_minutes INTEGER (GENERATED)</text>
+          <text x="20" y="138" class="pc">anomaly_score FLOAT</text>
+          <text x="20" y="150" class="pc">trigger_metric TEXT</text>
+          <text x="20" y="162" class="pc">observed_value / baseline_value FLOAT</text>
+          <text x="20" y="174" class="pc">deviation_sigma FLOAT</text>
+          <text x="20" y="186" class="pj">correlation_context JSONB</text>
+          <text x="20" y="198" class="pj">blast_radius JSONB</text>
+          <text x="20" y="210" class="pj">rca_candidates JSONB</text>
+          <text x="20" y="222" class="pc">top_root_cause TEXT</text>
+          <text x="20" y="234" class="pc">rca_confidence FLOAT</text>
+          <text x="20" y="246" class="pj">remediation_plan JSONB</text>
+          <text x="20" y="258" class="pc">created_at / updated_at TIMESTAMPTZ</text>
+          <text x="20" y="270" class="pf">IDX: status, severity, detection_time, services (GIN)</text>
+
+          <!-- postmortems table -->
+          <rect x="250" y="10" width="220" height="130" rx="6" fill="#100a1e" stroke="#8b5cf6" stroke-width="1.5"/>
+          <rect x="250" y="10" width="220" height="20" rx="6" fill="rgba(139,92,246,.3)"/>
+          <text x="360" y="25" class="pt" text-anchor="middle" fill="#a78bfa">postmortems</text>
+          <text x="260" y="42" class="pk">id UUID PK</text>
+          <text x="260" y="54" class="pf">incident_id UUID FK→incidents</text>
+          <text x="260" y="66" class="pc">title TEXT</text>
+          <text x="260" y="78" class="pc">full_markdown TEXT</text>
+          <text x="260" y="90" class="pc">executive_summary TEXT</text>
+          <text x="260" y="102" class="pc">root_cause TEXT</text>
+          <text x="260" y="114" class="pc">mttr_minutes FLOAT</text>
+          <text x="260" y="126" class="pc">severity / anomaly_type</text>
+
+          <!-- agent_events table -->
+          <rect x="250" y="155" width="220" height="110" rx="6" fill="#091422" stroke="#60a5fa" stroke-width="1.5"/>
+          <rect x="250" y="155" width="220" height="20" rx="6" fill="rgba(59,130,246,.2)"/>
+          <text x="360" y="170" class="pt" text-anchor="middle" fill="#60a5fa">agent_events</text>
+          <text x="260" y="187" class="pk">id UUID PK</text>
+          <text x="260" y="199" class="pf">incident_id UUID FK→incidents</text>
+          <text x="260" y="211" class="pc">agent_name VARCHAR(50)</text>
+          <text x="260" y="223" class="pc">event_type VARCHAR(80)</text>
+          <text x="260" y="235" class="pj">payload JSONB</text>
+          <text x="260" y="247" class="pc">created_at TIMESTAMPTZ</text>
+
+          <!-- email_notifications -->
+          <rect x="10" y="295" width="220" height="115" rx="6" fill="#091519" stroke="#06b6d4" stroke-width="1.5"/>
+          <rect x="10" y="295" width="220" height="20" rx="6" fill="rgba(6,182,212,.2)"/>
+          <text x="120" y="310" class="pt" text-anchor="middle" fill="#22d3ee">email_notifications</text>
+          <text x="20" y="327" class="pk">id UUID PK</text>
+          <text x="20" y="339" class="pf">incident_id UUID FK→incidents</text>
+          <text x="20" y="351" class="pc">notification_type VARCHAR(50)</text>
+          <text x="20" y="363" class="pc">recipients TEXT[]</text>
+          <text x="20" y="375" class="pc">subject / body_html TEXT</text>
+          <text x="20" y="387" class="pc">status CHECK(PENDING/SENT/FAILED)</text>
+          <text x="20" y="399" class="pc">sent_at TIMESTAMPTZ</text>
+
+          <!-- deployments -->
+          <rect x="10" y="425" width="220" height="90" rx="6" fill="#17150a" stroke="#eab308" stroke-width="1.5"/>
+          <rect x="10" y="425" width="220" height="20" rx="6" fill="rgba(234,179,8,.2)"/>
+          <text x="120" y="440" class="pt" text-anchor="middle" fill="#facc15">deployments</text>
+          <text x="20" y="457" class="pk">id UUID PK</text>
+          <text x="20" y="469" class="pc">service_name / version / deployed_by</text>
+          <text x="20" y="481" class="pc">change_type / git_sha / description</text>
+          <text x="20" y="493" class="pc">known_risks TEXT[]</text>
+          <text x="20" y="505" class="pc">deployed_at TIMESTAMPTZ</text>
+
+          <!-- service_registry -->
+          <rect x="250" y="280" width="220" height="140" rx="6" fill="#091422" stroke="#4ade80" stroke-width="1.5"/>
+          <rect x="250" y="280" width="220" height="20" rx="6" fill="rgba(34,197,94,.2)"/>
+          <text x="360" y="295" class="pt" text-anchor="middle" fill="#4ade80">service_registry</text>
+          <text x="260" y="312" class="pk">service_name TEXT PK (6 seeded)</text>
+          <text x="260" y="324" class="pc">team_owner TEXT</text>
+          <text x="260" y="336" class="pc">criticality VARCHAR(5) P0/P1</text>
+          <text x="260" y="348" class="pc">sla_p99_latency_ms INTEGER</text>
+          <text x="260" y="360" class="pc">sla_error_rate_pct FLOAT</text>
+          <text x="260" y="372" class="pc">on_call_rotation TEXT</text>
+          <text x="260" y="384" class="pc">upstream_services TEXT[]</text>
+          <text x="260" y="396" class="pc">downstream_services TEXT[]</text>
+
+          <!-- FK arrows -->
+          <line x1="250" y1="60" x2="230" y2="60" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#fk)"/>
+          <line x1="250" y1="200" x2="230" y2="200" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#fk)"/>
+          <line x1="120" y1="295" x2="120" y2="280" stroke="#06b6d4" stroke-width="1.5" marker-end="url(#fk)"/>
+
+          <!-- Views note -->
+          <rect x="250" y="435" width="220" height="75" rx="6" fill="rgba(59,130,246,.06)" stroke="#1e3050" stroke-width="1" stroke-dasharray="3,2"/>
+          <text x="360" y="452" class="pt" text-anchor="middle" fill="#94a3b8">VIEWS</text>
+          <text x="260" y="467" class="pc" fill="#60a5fa">active_incidents</text>
+          <text x="260" y="479" class="pc">WHERE status != 'RESOLVED'</text>
+          <text x="260" y="491" class="pc" fill="#60a5fa">incident_summary</text>
+          <text x="260" y="503" class="pc">JOIN postmortems, agent_events, emails</text>
+        </svg>
+        <div class="diagram-caption">Figure 9.1 — PostgreSQL ERD. The incidents table uses JSONB for flexible context storage (correlation_context, blast_radius, rca_candidates, remediation_plan) and a computed GENERATED column for MTTR.</div>
+      </div>
+    </div>
+    <div>
+      <h3>Redis Key Patterns</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 430 520" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:520px">
+          <style>.rk{font-family:'Courier New',monospace;fill:#4ade80;font-size:9px;font-weight:700}
+          .rt{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#e2e8f0;font-size:10px;font-weight:700}
+          .rs{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#94a3b8;font-size:9px}
+          .ri{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#4a6280;font-size:8px}</style>
+
+          <!-- Pattern 1: Metric baseline -->
+          <rect x="10" y="10" width="410" height="75" rx="7" fill="#0a1508" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="20" y="28" class="rt" fill="#4ade80">Rolling Metric Baseline</text>
+          <text x="20" y="45" class="rk">metric:{service_name}:{metric_name}</text>
+          <text x="20" y="58" class="rs">Type: LIST · LPUSH value · LTRIM 0 49 (last 50 values)</text>
+          <text x="20" y="70" class="ri">Used by: Detection Agent for z-score baseline · No TTL (persistent)</text>
+
+          <!-- Pattern 2: Dedup -->
+          <rect x="10" y="95" width="410" height="75" rx="7" fill="#150a0a" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="20" y="113" class="rt" fill="#f87171">Alert Deduplication</text>
+          <text x="20" y="130" class="rk">dedup:{service}:{anomaly_type}:{metric}</text>
+          <text x="20" y="143" class="rs">Type: STRING · SET NX (only if not exists) · TTL = 300s (5 min)</text>
+          <text x="20" y="155" class="ri">Suppresses re-processing the same anomaly within the dedup window</text>
+
+          <!-- Pattern 3: Active incident -->
+          <rect x="10" y="180" width="410" height="75" rx="7" fill="#0a1628" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="20" y="198" class="rt" fill="#93c5fd">Active Incident Lock</text>
+          <text x="20" y="215" class="rk">active_incident:{service_name}</text>
+          <text x="20" y="228" class="rs">Type: STRING (incident_id) · TTL = 1800s (30 min)</text>
+          <text x="20" y="240" class="ri">Prevents duplicate incidents while one is open — cascade grouping</text>
+
+          <!-- Pattern 4: Error count -->
+          <rect x="10" y="265" width="410" height="75" rx="7" fill="#150a0a" stroke="#f97316" stroke-width="1.5"/>
+          <text x="20" y="283" class="rt" fill="#fb923c">Log Error Burst Counter</text>
+          <text x="20" y="300" class="rk">error_count:{service_name}</text>
+          <text x="20" y="313" class="rs">Type: STRING (integer) · INCR · TTL = 60s (sliding window)</text>
+          <text x="20" y="325" class="ri">Fires log-based anomaly if count ≥ 5 errors in 60s window</text>
+
+          <!-- Pattern 5: KR pub/sub -->
+          <rect x="10" y="350" width="410" height="95" rx="7" fill="#0a1a0a" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="20" y="368" class="rt" fill="#4ade80">KR Request/Response (Redis pub/sub)</text>
+          <text x="20" y="386" class="rk">kr:req:{request_id}  →  BLPUSH by Investigation/Remediation Agent</text>
+          <text x="20" y="399" class="rk">kr:res:{request_id}  →  BLPUSH by KR Agent</text>
+          <text x="20" y="413" class="rs">KR Agent: while True: result = BLPOP kr:req:* timeout=5s</text>
+          <text x="20" y="426" class="rs">Investigation: wait_kr_response() = BLPOP kr:res:{id} timeout=15s</text>
+          <text x="20" y="438" class="ri">Synchronous RPC over Redis: query + wait. No Kafka for KR (needs response).</text>
+
+          <!-- Pattern 6: Failure state -->
+          <rect x="10" y="455" width="410" height="60" rx="7" fill="#180d00" stroke="#f59e0b" stroke-width="1.5"/>
+          <text x="20" y="473" class="rt" fill="#fbbf24">Failure Injector State</text>
+          <text x="20" y="490" class="rk">failure:state:{service_name}</text>
+          <text x="20" y="503" class="rs">Type: HASH · Fields: latency_p99, error_rate, cpu, memory, db_connections</text>
+          <text x="20" y="516" class="ri">Written by failure-injector · read by traffic-simulator every tick</text>
+        </svg>
+        <div class="diagram-caption">Figure 9.2 — Redis key patterns. Six distinct patterns for different concerns: baseline tracking, dedup, incident locking, error counting, synchronous KR RPC, and failure injection state.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ─── SECTION 10: Full Execution Flow ────────────────────────────────────── -->
+<section id="execution-flow">
+<div class="container">
+  <div class="section-tag" style="background:rgba(34,197,94,.1);color:var(--green2)">Section 10</div>
+  <h2>Full Incident Execution Flow</h2>
+  <p>The complete lifecycle from anomaly onset to postmortem generation, showing the sequence of Kafka events, agent decisions, database writes, and email dispatches.</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1050 580" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:580px">
+      <defs>
+        <marker id="seq" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#4a6280"/></marker>
+        <marker id="seq-red" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#ef4444"/></marker>
+        <marker id="seq-orange" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#f97316"/></marker>
+        <marker id="seq-yellow" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#eab308"/></marker>
+        <marker id="seq-green" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#22c55e"/></marker>
+        <marker id="seq-teal" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#14b8a6"/></marker>
+        <marker id="seq-cyan" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#06b6d4"/></marker>
+        <marker id="seq-violet" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#8b5cf6"/></marker>
+      </defs>
+      <style>.lt{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#e2e8f0;font-size:9px;font-weight:700}
+      .ls{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#94a3b8;font-size:8px}
+      .lm{font-family:'Courier New',monospace;fill:#4a6280;font-size:8px}</style>
+
+      <!-- Participant labels -->
+      <text x="60" y="22" class="lt" text-anchor="middle" fill="#3b82f6">Simulators</text>
+      <text x="155" y="22" class="lt" text-anchor="middle" fill="#a855f7">Kafka</text>
+      <text x="255" y="22" class="lt" text-anchor="middle" fill="#ef4444">Detection</text>
+      <text x="355" y="22" class="lt" text-anchor="middle" fill="#f97316">Correlation</text>
+      <text x="460" y="22" class="lt" text-anchor="middle" fill="#eab308">Investigation</text>
+      <text x="570" y="22" class="lt" text-anchor="middle" fill="#22c55e">KR Agent</text>
+      <text x="675" y="22" class="lt" text-anchor="middle" fill="#14b8a6">Remediation</text>
+      <text x="780" y="22" class="lt" text-anchor="middle" fill="#06b6d4">Comm Agent</text>
+      <text x="890" y="22" class="lt" text-anchor="middle" fill="#8b5cf6">Postmortem</text>
+
+      <!-- Lifelines -->
+      <line x1="60" y1="28" x2="60" y2="578" stroke="#1e3050" stroke-width="1" stroke-dasharray="4,3"/>
+      <line x1="155" y1="28" x2="155" y2="578" stroke="#1e3050" stroke-width="1" stroke-dasharray="4,3"/>
+      <line x1="255" y1="28" x2="255" y2="578" stroke="#1e3050" stroke-width="1" stroke-dasharray="4,3"/>
+      <line x1="355" y1="28" x2="355" y2="578" stroke="#1e3050" stroke-width="1" stroke-dasharray="4,3"/>
+      <line x1="460" y1="28" x2="460" y2="578" stroke="#1e3050" stroke-width="1" stroke-dasharray="4,3"/>
+      <line x1="570" y1="28" x2="570" y2="578" stroke="#1e3050" stroke-width="1" stroke-dasharray="4,3"/>
+      <line x1="675" y1="28" x2="675" y2="578" stroke="#1e3050" stroke-width="1" stroke-dasharray="4,3"/>
+      <line x1="780" y1="28" x2="780" y2="578" stroke="#1e3050" stroke-width="1" stroke-dasharray="4,3"/>
+      <line x1="890" y1="28" x2="890" y2="578" stroke="#1e3050" stroke-width="1" stroke-dasharray="4,3"/>
+
+      <!-- Message 1: Simulator → Kafka raw.metrics -->
+      <line x1="65" y1="50" x2="148" y2="50" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#seq)"/>
+      <text x="100" y="44" class="ls" text-anchor="middle" fill="#93c5fd">raw.metrics (continuous)</text>
+
+      <!-- Message 2: Kafka → Detection -->
+      <line x1="160" y1="65" x2="248" y2="65" stroke="#ef4444" stroke-width="1.5" marker-end="url(#seq-red)"/>
+      <text x="205" y="59" class="ls" text-anchor="middle" fill="#f87171">consume raw.metrics</text>
+
+      <!-- Note: Detection processing -->
+      <rect x="215" y="74" width="80" height="28" rx="4" fill="rgba(239,68,68,.08)" stroke="#ef4444" stroke-width=".8" stroke-dasharray="2,2"/>
+      <text x="255" y="86" class="ls" text-anchor="middle" fill="#f87171">z-score gate</text>
+      <text x="255" y="97" class="ls" text-anchor="middle" fill="#f87171">LLM Haiku classify</text>
+
+      <!-- Message 3: Detection → Kafka anomalies.detected -->
+      <line x1="263" y1="110" x2="148" y2="110" stroke="#ef4444" stroke-width="1.5" marker-end="url(#seq-red)"/>
+      <text x="205" y="104" class="ls" text-anchor="middle" fill="#f87171">anomalies.detected</text>
+
+      <!-- Message: Kafka → Communication (email 1) -->
+      <line x1="160" y1="125" x2="773" y2="125" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#seq-cyan)"/>
+      <text x="460" y="119" class="ls" text-anchor="middle" fill="#22d3ee">→ Email: INCIDENT_OPENED (oncall only)</text>
+
+      <!-- Message 4: Kafka → Correlation -->
+      <line x1="160" y1="145" x2="348" y2="145" stroke="#f97316" stroke-width="1.5" marker-end="url(#seq-orange)"/>
+      <text x="250" y="139" class="ls" text-anchor="middle" fill="#fb923c">consume anomalies.detected</text>
+
+      <!-- Note: Correlation processing -->
+      <rect x="310" y="154" width="95" height="45" rx="4" fill="rgba(249,115,22,.08)" stroke="#f97316" stroke-width=".8" stroke-dasharray="2,2"/>
+      <text x="358" y="167" class="ls" text-anchor="middle" fill="#fb923c">replay_window(30min)</text>
+      <text x="358" y="178" class="ls" text-anchor="middle" fill="#fb923c">deployment check</text>
+      <text x="358" y="189" class="ls" text-anchor="middle" fill="#fb923c">cascade detection</text>
+
+      <!-- Message 5: Correlation → Kafka incidents.opened -->
+      <line x1="363" y1="208" x2="148" y2="208" stroke="#f97316" stroke-width="1.5" marker-end="url(#seq-orange)"/>
+      <text x="250" y="202" class="ls" text-anchor="middle" fill="#fb923c">incidents.opened</text>
+
+      <!-- Message 6: Kafka → Investigation -->
+      <line x1="160" y1="225" x2="453" y2="225" stroke="#eab308" stroke-width="1.5" marker-end="url(#seq-yellow)"/>
+      <text x="305" y="219" class="ls" text-anchor="middle" fill="#facc15">consume incidents.opened</text>
+
+      <!-- Message 7: Investigation → KR (5×) -->
+      <line x1="468" y1="245" x2="562" y2="245" stroke="#22c55e" stroke-width="1.5" marker-end="url(#seq-green)"/>
+      <text x="515" y="239" class="ls" text-anchor="middle" fill="#4ade80">5× parallel kr:req:{id}</text>
+      <rect x="520" y="252" width="105" height="22" rx="4" fill="rgba(34,197,94,.08)" stroke="#22c55e" stroke-width=".8" stroke-dasharray="2,2"/>
+      <text x="573" y="267" class="ls" text-anchor="middle" fill="#4ade80">Qdrant search × 5 types</text>
+
+      <!-- Message 8: KR → Investigation -->
+      <line x1="562" y1="284" x2="468" y2="284" stroke="#22c55e" stroke-width="1.5" marker-end="url(#seq-green)"/>
+      <text x="515" y="278" class="ls" text-anchor="middle" fill="#4ade80">KRResponse (4096 token budget)</text>
+
+      <!-- Note: LLM tool-use RCA -->
+      <rect x="415" y="293" width="95" height="40" rx="4" fill="rgba(234,179,8,.08)" stroke="#eab308" stroke-width=".8" stroke-dasharray="2,2"/>
+      <text x="463" y="306" class="ls" text-anchor="middle" fill="#facc15">Sonnet tool-use loop</text>
+      <text x="463" y="317" class="ls" text-anchor="middle" fill="#facc15">confidence scoring</text>
+      <text x="463" y="328" class="ls" text-anchor="middle" fill="#facc15">max 8 rounds</text>
+
+      <!-- Message 9: Investigation → Kafka rca.completed -->
+      <line x1="468" y1="342" x2="148" y2="342" stroke="#eab308" stroke-width="1.5" marker-end="url(#seq-yellow)"/>
+      <text x="305" y="336" class="ls" text-anchor="middle" fill="#facc15">rca.completed</text>
+
+      <!-- Email: RCA_AVAILABLE -->
+      <line x1="160" y1="356" x2="773" y2="356" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#seq-cyan)"/>
+      <text x="460" y="350" class="ls" text-anchor="middle" fill="#22d3ee">→ Email: RCA_AVAILABLE (oncall)</text>
+
+      <!-- Message 10: Kafka → Remediation -->
+      <line x1="160" y1="375" x2="668" y2="375" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#seq-teal)"/>
+      <text x="410" y="369" class="ls" text-anchor="middle" fill="#2dd4bf">consume rca.completed</text>
+
+      <!-- Remediation → KR -->
+      <line x1="683" y1="393" x2="577" y2="393" stroke="#22c55e" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#seq-green)"/>
+      <text x="630" y="387" class="ls" text-anchor="middle" fill="#4ade80">runbook lookup</text>
+      <line x1="577" y1="407" x2="683" y2="407" stroke="#22c55e" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#seq-teal)"/>
+
+      <!-- Message 11: Remediation → Kafka remediation.plans -->
+      <line x1="683" y1="425" x2="148" y2="425" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#seq-teal)"/>
+      <text x="410" y="419" class="ls" text-anchor="middle" fill="#2dd4bf">remediation.plans</text>
+
+      <!-- Email: REMEDIATION_PLAN -->
+      <line x1="160" y1="440" x2="773" y2="440" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#seq-cyan)"/>
+      <text x="460" y="434" class="ls" text-anchor="middle" fill="#22d3ee">→ Email: REMEDIATION_PLAN (oncall)</text>
+
+      <!-- Resolution monitor fires -->
+      <line x1="460" y1="458" x2="148" y2="458" stroke="#22c55e" stroke-width="1.5" marker-end="url(#seq-green)"/>
+      <text x="305" y="452" class="ls" text-anchor="middle" fill="#4ade80">incidents.resolved (background thread)</text>
+
+      <!-- Email: INCIDENT_RESOLVED -->
+      <line x1="160" y1="473" x2="773" y2="473" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#seq-cyan)"/>
+      <text x="460" y="467" class="ls" text-anchor="middle" fill="#22d3ee">→ Email: INCIDENT_RESOLVED (all)</text>
+
+      <!-- Kafka → Postmortem -->
+      <line x1="160" y1="492" x2="882" y2="492" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#seq-violet)"/>
+      <text x="520" y="486" class="ls" text-anchor="middle" fill="#a78bfa">consume incidents.resolved</text>
+
+      <!-- Postmortem processing note -->
+      <rect x="845" y="500" width="100" height="40" rx="4" fill="rgba(139,92,246,.08)" stroke="#8b5cf6" stroke-width=".8" stroke-dasharray="2,2"/>
+      <text x="895" y="513" class="ls" text-anchor="middle" fill="#a78bfa">6 LLM passes</text>
+      <text x="895" y="524" class="ls" text-anchor="middle" fill="#a78bfa">Postgres + Qdrant</text>
+
+      <!-- Postmortem → Kafka -->
+      <line x1="882" y1="550" x2="148" y2="550" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#seq-violet)"/>
+      <text x="520" y="544" class="ls" text-anchor="middle" fill="#a78bfa">postmortems.generated</text>
+
+      <!-- Email: POSTMORTEM_READY -->
+      <line x1="160" y1="565" x2="773" y2="565" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#seq-cyan)"/>
+      <text x="460" y="579" class="ls" text-anchor="middle" fill="#22d3ee">→ Email: POSTMORTEM_READY (all)</text>
+    </svg>
+    <div class="diagram-caption">Figure 10.1 — Full incident lifecycle sequence diagram. Dashed horizontal arrows are email dispatches from the Communication Agent. The resolution monitor is a background goroutine inside the Investigation Agent that polls the trigger metric every 30 seconds.</div>
+  </div>
+
+  <h3>Communication Agent Email Routing</h3>
+  <table>
+    <thead><tr><th>Email Type</th><th>Trigger Topic</th><th>Recipients</th><th>Condition</th></tr></thead>
+    <tbody>
+      <tr><td><strong>INCIDENT_OPENED</strong></td><td><code>anomalies.detected</code></td><td>oncall only</td><td>severity = CRITICAL or HIGH</td></tr>
+      <tr><td><strong>RCA_AVAILABLE</strong></td><td><code>rca.completed</code></td><td>oncall only</td><td>always (when rca received)</td></tr>
+      <tr><td><strong>REMEDIATION_PLAN</strong></td><td><code>remediation.plans</code></td><td>oncall only</td><td>always</td></tr>
+      <tr><td><strong>INCIDENT_RESOLVED</strong></td><td><code>incidents.resolved</code></td><td>all (oncall + team + management)</td><td>always</td></tr>
+      <tr><td><strong>POSTMORTEM_READY</strong></td><td><code>postmortems.generated</code></td><td>all</td><td>always</td></tr>
+    </tbody>
+  </table>
+  <p class="note"><strong>Routing heuristic:</strong> The Communication Agent reads all 5 topics in a single consumer group. Since the Kafka message handler doesn't expose the topic name, routing uses field-presence heuristics: <code>anomaly_score</code> → INCIDENT_OPENED; <code>root_cause_candidates</code> → RCA_AVAILABLE; <code>action_steps</code> → REMEDIATION_PLAN; <code>resolution_method</code> → RESOLVED; <code>postmortem</code> field length &gt; 100 → POSTMORTEM_READY.</p>
+</div>
+</section>
+
+<!-- ─── SECTION 11: Postmortem 6-Pass Generation ──────────────────────────── -->
+<section>
+<div class="container">
+  <div class="section-tag" style="background:rgba(139,92,246,.1);color:var(--violet2)">Section 11</div>
+  <h2>Postmortem Agent — 6-Pass LLM Generation</h2>
+  <p>Each postmortem section has different constraints (length, audience, format). A single unconstrained prompt produces mediocre output across all sections. Six focused passes each with a specific directive produce expert-level output per section.</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1050 240" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:240px">
+      <defs>
+        <marker id="post" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#8b5cf6"/></marker>
+      </defs>
+      <style>.po{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#e2e8f0;font-size:10px;font-weight:700}
+      .ps{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#94a3b8;font-size:8.5px}
+      .pi{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#4a6280;font-size:8px}</style>
+
+      <!-- Shared context box -->
+      <rect x="10" y="10" width="190" height="210" rx="7" fill="#0a0818" stroke="#6366f1" stroke-width="1.5"/>
+      <text x="105" y="28" class="po" text-anchor="middle" fill="#818cf8">Incident Context</text>
+      <text x="105" y="44" class="ps" text-anchor="middle">Built from:</text>
+      <text x="20" y="58" class="pi">• Postgres: incident record</text>
+      <text x="20" y="70" class="pi">• Postgres: agent_events timeline</text>
+      <text x="20" y="82" class="pi">• rca_candidates (JSON)</text>
+      <text x="20" y="94" class="pi">• correlation_context signals</text>
+      <text x="20" y="106" class="pi">• blast_radius</text>
+      <text x="20" y="118" class="pi">• deployment correlation</text>
+      <text x="20" y="130" class="pi">• trigger metric values</text>
+      <text x="105" y="152" class="ps" text-anchor="middle">Same ctx string</text>
+      <text x="105" y="164" class="ps" text-anchor="middle">prepended to all 6</text>
+      <text x="105" y="176" class="ps" text-anchor="middle">prompts. Each pass</text>
+      <text x="105" y="188" class="ps" text-anchor="middle">has focused directive.</text>
+      <text x="105" y="204" class="po" text-anchor="middle" fill="#8b5cf6">temp=0.1</text>
+
+      <!-- 6 pass boxes -->
+      <!-- Pass 1 -->
+      <line x1="200" y1="115" x2="220" y2="50" stroke="#8b5cf6" stroke-width="1.5"/>
+      <line x1="220" y1="50" x2="235" y2="50" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#post)"/>
+      <rect x="235" y="25" width="125" height="55" rx="6" fill="#100a1e" stroke="#8b5cf6" stroke-width="1.5"/>
+      <text x="298" y="41" class="po" text-anchor="middle" fill="#a78bfa" font-size="9">Pass 1 — Exec Summary</text>
+      <text x="298" y="54" class="ps" text-anchor="middle">"non-technical, leadership"</text>
+      <text x="298" y="65" class="ps" text-anchor="middle">max_tokens=300 · 2-3 sentences</text>
+      <text x="298" y="74" class="pi" text-anchor="middle">user impact + duration + resolution</text>
+
+      <!-- Pass 2 -->
+      <line x1="200" y1="115" x2="220" y2="115" stroke="#8b5cf6" stroke-width="1.5"/>
+      <line x1="220" y1="88" x2="235" y2="88" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#post)"/>
+      <rect x="235" y="65" width="125" height="55" rx="6" fill="#100a1e" stroke="#8b5cf6" stroke-width="1.5"/>
+      <text x="298" y="81" class="po" text-anchor="middle" fill="#a78bfa" font-size="9">Pass 2 — Timeline</text>
+      <text x="298" y="94" class="ps" text-anchor="middle">"HH:MM UTC — what happened"</text>
+      <text x="298" y="105" class="ps" text-anchor="middle">max_tokens=500 · ≤10 bullets</text>
+      <text x="298" y="114" class="pi" text-anchor="middle">detection → steps → resolution</text>
+
+      <!-- Pass 3 -->
+      <line x1="220" y1="130" x2="235" y2="130" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#post)"/>
+      <rect x="235" y="107" width="125" height="55" rx="6" fill="#100a1e" stroke="#8b5cf6" stroke-width="1.5"/>
+      <text x="298" y="123" class="po" text-anchor="middle" fill="#a78bfa" font-size="9">Pass 3 — Root Cause</text>
+      <text x="298" y="136" class="ps" text-anchor="middle">"immediate trigger + underlying</text>
+      <text x="298" y="147" class="ps" text-anchor="middle">cause + why safeguards missed"</text>
+      <text x="298" y="157" class="ps" text-anchor="middle">max_tokens=400 · 3-5 sentences</text>
+
+      <!-- Pass 4 -->
+      <line x1="220" y1="172" x2="235" y2="172" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#post)"/>
+      <rect x="235" y="149" width="125" height="55" rx="6" fill="#100a1e" stroke="#8b5cf6" stroke-width="1.5"/>
+      <text x="298" y="165" class="po" text-anchor="middle" fill="#a78bfa" font-size="9">Pass 4 — Impact</text>
+      <text x="298" y="178" class="ps" text-anchor="middle">"users, SLA breach, peak</text>
+      <text x="298" y="189" class="ps" text-anchor="middle">error rate, P99 latency"</text>
+      <text x="298" y="200" class="ps" text-anchor="middle">max_tokens=300 · table/bullets</text>
+
+      <!-- Pass 5 -->
+      <line x1="220" y1="172" x2="220" y2="205" stroke="#8b5cf6" stroke-width="1.5"/>
+      <rect x="235" y="192" width="125" height="48" rx="6" fill="#100a1e" stroke="#8b5cf6" stroke-width="1.5"/>
+      <text x="298" y="207" class="po" text-anchor="middle" fill="#a78bfa" font-size="9">Pass 5 — Contributing Factors</text>
+      <text x="298" y="220" class="ps" text-anchor="middle">"3-5 systemic issues"</text>
+      <text x="298" y="231" class="ps" text-anchor="middle">max_tokens=400 · numbered list</text>
+
+      <!-- Pass 6 -->
+      <line x1="220" y1="205" x2="235" y2="225" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#post)"/>
+      <rect x="235" y="215" width="165" height="20" rx="6" fill="#100a1e" stroke="#8b5cf6" stroke-width="1.5"/>
+      <text x="298" y="228" class="pi" text-anchor="middle" fill="#a78bfa">Pass 6 skipped here for space</text>
+
+      <!-- Output box -->
+      <line x1="360" y1="115" x2="410" y2="115" stroke="#8b5cf6" stroke-width="2" marker-end="url(#post)"/>
+      <rect x="410" y="60" width="280" height="130" rx="7" fill="#0a0818" stroke="#6366f1" stroke-width="1.5"/>
+      <text x="550" y="78" class="po" text-anchor="middle" fill="#818cf8">Assembled Postmortem</text>
+      <text x="550" y="93" class="ps" text-anchor="middle">Full Markdown assembled from 6 sections</text>
+      <text x="550" y="107" class="ps" text-anchor="middle">Stored in Postgres (postmortems table)</text>
+      <text x="550" y="121" class="ps" text-anchor="middle">Indexed into Qdrant postmortems collection</text>
+      <text x="550" y="135" class="ps" text-anchor="middle">(self-improving knowledge base)</text>
+      <text x="550" y="151" class="ps" text-anchor="middle">Published → postmortems.generated</text>
+      <text x="550" y="165" class="ps" text-anchor="middle">Email POSTMORTEM_READY → all recipients</text>
+      <text x="550" y="182" class="pi" text-anchor="middle">API: GET /incidents/{id}/postmortem</text>
+
+      <!-- Pass 6 action items box -->
+      <rect x="700" y="15" width="340" height="180" rx="7" fill="rgba(22,35,64,.5)" stroke="#1e3050" stroke-width="1"/>
+      <text x="870" y="33" class="po" text-anchor="middle" fill="#94a3b8">PASS 6 — Action Items (SMART format)</text>
+      <text x="870" y="52" class="ps" text-anchor="middle">"Generate 3-5 SMART action items to prevent recurrence.</text>
+      <text x="870" y="65" class="ps" text-anchor="middle">Format: | Action | Owner | Priority | Due Date |</text>
+      <text x="870" y="78" class="ps" text-anchor="middle">Due dates within 30-60 days of today."</text>
+      <text x="870" y="95" class="po" text-anchor="middle" fill="#facc15">Example output:</text>
+      <text x="710" y="112" class="pi">| Add index on transactions.service_id | payments-team | HIGH | 2026-07-20 |</text>
+      <text x="710" y="125" class="pi">| Enable slow query logging in prod | DBA | MEDIUM | 2026-07-10 |</text>
+      <text x="710" y="138" class="pi">| Add connection pool alerting at 80% | platform-team | HIGH | 2026-07-15 |</text>
+      <text x="870" y="158" class="po" text-anchor="middle" fill="#94a3b8">Total: ~6,000 tokens × 6 passes</text>
+      <text x="870" y="172" class="ps" text-anchor="middle">~$0.018/incident · ~2 minutes total</text>
+      <text x="870" y="185" class="ps" text-anchor="middle">Quality significantly exceeds 1-pass approach</text>
+    </svg>
+    <div class="diagram-caption">Figure 11.1 — 6-pass postmortem generation. The same incident context is prepended to all 6 prompts, each with a focused directive. Generated postmortems are indexed into Qdrant, making every resolved incident part of the permanent knowledge base for future investigations.</div>
+  </div>
+</div>
+</section>
+
+<!-- ─── SECTION 12: Startup Timeline ──────────────────────────────────────── -->
+<section id="startup">
+<div class="container">
+  <div class="section-tag" style="background:rgba(6,182,212,.1);color:var(--cyan2)">Section 12</div>
+  <h2>System Startup Timeline</h2>
+  <p>Docker Compose dependency ordering ensures services start in the correct sequence. Health checks gate each layer before dependents start.</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1050 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:200px">
+      <style>.tt{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#e2e8f0;font-size:9px;font-weight:700}
+      .ts{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;fill:#94a3b8;font-size:8px}</style>
+
+      <!-- Timeline bar -->
+      <line x1="30" y1="100" x2="1020" y2="100" stroke="#1e3050" stroke-width="2"/>
+
+      <!-- T markers -->
+      <line x1="30" y1="95" x2="30" y2="105" stroke="#4a6280" stroke-width="1"/>
+      <text x="30" y="120" class="ts" text-anchor="middle" fill="#4a6280">0s</text>
+
+      <line x1="100" y1="95" x2="100" y2="105" stroke="#4a6280" stroke-width="1"/>
+      <text x="100" y="120" class="ts" text-anchor="middle" fill="#4a6280">15s</text>
+
+      <line x1="200" y1="95" x2="200" y2="105" stroke="#4a6280" stroke-width="1"/>
+      <text x="200" y="120" class="ts" text-anchor="middle" fill="#4a6280">30s</text>
+
+      <line x1="350" y1="95" x2="350" y2="105" stroke="#4a6280" stroke-width="1"/>
+      <text x="350" y="120" class="ts" text-anchor="middle" fill="#4a6280">90s</text>
+
+      <line x1="370" y1="95" x2="370" y2="105" stroke="#4a6280" stroke-width="1"/>
+      <text x="370" y="120" class="ts" text-anchor="middle" fill="#4a6280">95s</text>
+
+      <line x1="420" y1="95" x2="420" y2="105" stroke="#4a6280" stroke-width="1"/>
+      <text x="420" y="120" class="ts" text-anchor="middle" fill="#4a6280">120s</text>
+
+      <line x1="470" y1="95" x2="470" y2="105" stroke="#4a6280" stroke-width="1"/>
+      <text x="470" y="120" class="ts" text-anchor="middle" fill="#4a6280">135s</text>
+
+      <line x1="570" y1="95" x2="570" y2="105" stroke="#4a6280" stroke-width="1"/>
+      <text x="570" y="120" class="ts" text-anchor="middle" fill="#4a6280">190s</text>
+
+      <line x1="620" y1="95" x2="620" y2="105" stroke="#4a6280" stroke-width="1"/>
+      <text x="620" y="120" class="ts" text-anchor="middle" fill="#4a6280">220s</text>
+
+      <line x1="1020" y1="95" x2="1020" y2="105" stroke="#4a6280" stroke-width="1"/>
+      <text x="1020" y="120" class="ts" text-anchor="middle" fill="#4a6280">~500s</text>
+
+      <!-- Events on the timeline -->
+      <!-- Infrastructure start -->
+      <circle cx="30" cy="100" r="6" fill="#3b82f6"/>
+      <text x="30" y="82" class="tt" text-anchor="middle" fill="#93c5fd">Infra up</text>
+      <text x="30" y="70" class="ts" text-anchor="middle">Kafka, PG, Qdrant</text>
+      <text x="30" y="58" class="ts" text-anchor="middle">Redis, Loki, Prom</text>
+
+      <!-- Knowledge seeder starts -->
+      <circle cx="100" cy="100" r="6" fill="#6366f1"/>
+      <text x="100" y="82" class="tt" text-anchor="middle" fill="#818cf8">Seeder starts</text>
+      <text x="100" y="70" class="ts" text-anchor="middle">Embed 280 vectors</text>
+
+      <!-- Quiet period -->
+      <rect x="100" y="95" width="250" height="10" rx="5" fill="rgba(99,102,241,.2)" stroke="#6366f1" stroke-width="1" stroke-dasharray="3,2"/>
+
+      <!-- Seeder complete -->
+      <circle cx="350" cy="100" r="6" fill="#22c55e"/>
+      <line x1="350" y1="94" x2="350" y2="50" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2"/>
+      <text x="350" y="40" class="tt" text-anchor="middle" fill="#4ade80">Seeder done</text>
+      <text x="350" y="28" class="ts" text-anchor="middle">~280 vectors across 5 collections</text>
+
+      <!-- Agents + ingesters start -->
+      <circle cx="370" cy="100" r="6" fill="#60a5fa"/>
+      <text x="440" y="82" class="tt" text-anchor="middle" fill="#93c5fd">All 7 agents + 3 ingesters active</text>
+      <text x="440" y="70" class="ts" text-anchor="middle">Traffic simulator: baseline metrics publishing</text>
+
+      <!-- Failure injector activates -->
+      <circle cx="420" cy="100" r="6" fill="#ef4444"/>
+      <line x1="420" y1="94" x2="420" y2="140" stroke="#ef4444" stroke-width="1" stroke-dasharray="2,2"/>
+      <text x="420" y="152" class="tt" text-anchor="middle" fill="#f87171">First failure injected</text>
+      <text x="420" y="164" class="ts" text-anchor="middle">Redis: failure:state:payment-service</text>
+
+      <!-- Detection fires -->
+      <circle cx="470" cy="100" r="6" fill="#ef4444"/>
+      <text x="470" y="82" class="tt" text-anchor="middle" fill="#f87171">σ &gt; 2.5</text>
+      <text x="470" y="70" class="ts" text-anchor="middle">Detection fires → anomalies.detected</text>
+
+      <!-- RCA complete -->
+      <circle cx="570" cy="100" r="6" fill="#facc15"/>
+      <line x1="570" y1="94" x2="570" y2="140" stroke="#eab308" stroke-width="1" stroke-dasharray="2,2"/>
+      <text x="570" y="152" class="tt" text-anchor="middle" fill="#facc15">RCA complete</text>
+      <text x="570" y="164" class="ts" text-anchor="middle">rca.completed → remediation.plans</text>
+
+      <!-- First emails -->
+      <circle cx="620" cy="100" r="6" fill="#06b6d4"/>
+      <text x="620" y="82" class="tt" text-anchor="middle" fill="#22d3ee">Emails visible</text>
+      <text x="620" y="70" class="ts" text-anchor="middle">Mailhog: INCIDENT_OPENED, RCA, PLAN</text>
+
+      <!-- Resolution -->
+      <circle cx="1020" cy="100" r="8" fill="#22c55e"/>
+      <line x1="1020" y1="94" x2="1020" y2="40" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2"/>
+      <text x="1020" y="30" class="tt" text-anchor="middle" fill="#4ade80">Resolved + Postmortem</text>
+      <text x="1020" y="18" class="ts" text-anchor="middle">incidents.resolved → postmortems.generated</text>
+
+      <!-- Arrow showing 5 emails total -->
+      <rect x="640" y="140" width="350" height="50" rx="6" fill="rgba(6,182,212,.06)" stroke="#06b6d4" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="815" y="158" class="tt" text-anchor="middle" fill="#22d3ee">5 emails per incident lifecycle</text>
+      <text x="815" y="173" class="ts" text-anchor="middle">🚨 OPENED · 🔍 RCA · 🛠️ REMEDIATION · ✅ RESOLVED · 📋 POSTMORTEM</text>
+    </svg>
+    <div class="diagram-caption">Figure 12.1 — Startup timeline from docker compose up to first postmortem. Total pipeline from failure onset to first email is typically under 5 minutes.</div>
+  </div>
+
+  <h3>Health Check Dependency Chain</h3>
+  <div class="code-block">
+<span class="c"># Startup order enforced by Docker Compose health checks</span>
+zookeeper → kafka (condition: service_healthy)
+kafka → kafka-ui, knowledge-seeder, traffic-simulator, all-agents, all-ingesters
+postgres → knowledge-seeder, deployment-ingester, deployment-simulator, all-agents
+redis → all-agents, traffic-simulator, failure-injector
+qdrant → knowledge-seeder, knowledge-retrieval-agent
+knowledge-seeder → knowledge-retrieval-agent (condition: service_completed_successfully)
+traffic-simulator → failure-injector (condition: service_healthy)
+loki → log-ingester
+prometheus → metrics-ingester, grafana</div>
+</div>
+</section>
+
+<!-- ─── SECTION 13: Cost Model ─────────────────────────────────────────────── -->
+<section id="cost">
+<div class="container">
+  <div class="section-tag" style="background:rgba(34,197,94,.1);color:var(--green2)">Section 13</div>
+  <h2>Cost Model & Optimisation Strategy</h2>
+
+  <table>
+    <thead><tr><th>Agent</th><th>Model</th><th>Avg Input Tokens</th><th>Avg Output Tokens</th><th>Est. Cost/Incident</th><th>Rationale</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Detection</strong> (per event)</td><td><code>claude-haiku-4-5</code></td><td>~400</td><td>~100</td><td>~$0.0004</td><td>High throughput — cheapest viable model</td></tr>
+      <tr><td><strong>Correlation</strong></td><td><code>claude-sonnet-4-6</code></td><td>~1,200</td><td>~300</td><td>~$0.0045</td><td>Short summary task — Sonnet overkill but consistent</td></tr>
+      <tr><td><strong>Investigation</strong></td><td><code>claude-sonnet-4-6</code></td><td>~5,000</td><td>~3,000</td><td>~$0.024</td><td>Chain-of-thought RCA needs reasoning capability</td></tr>
+      <tr><td><strong>Knowledge Retrieval</strong></td><td>local embedding model</td><td>—</td><td>—</td><td>~$0.0001</td><td>Local SentenceTransformer — no API cost</td></tr>
+      <tr><td><strong>Remediation</strong></td><td><code>claude-sonnet-4-6</code></td><td>~2,000</td><td>~1,000</td><td>~$0.009</td><td>Structured JSON output — Sonnet reliable</td></tr>
+      <tr><td><strong>Communication</strong></td><td>—</td><td>—</td><td>—</td><td>$0</td><td>HTML templates — no LLM calls</td></tr>
+      <tr><td><strong>Postmortem</strong> (6 passes)</td><td><code>claude-sonnet-4-6</code></td><td>~4,000</td><td>~2,000</td><td>~$0.018</td><td>Each pass focused — quality &gt;&gt; 1 unconstrained pass</td></tr>
+      <tr style="background:rgba(59,130,246,.06)"><td><strong>Total per incident</strong></td><td></td><td><strong>~12,600</strong></td><td><strong>~6,400</strong></td><td><strong>~$0.055</strong></td><td>~$33/month at 20 incidents/day</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin-top:1.5rem">Cost Optimisation Mechanisms (Already Implemented)</h3>
+  <div class="card-grid card-grid-3">
+    <div class="card">
+      <h3 style="color:var(--amber2)">Model Tiering</h3>
+      <p>Detection uses <code>claude-haiku-4-5</code> (~8× cheaper than Sonnet). Only agents that need multi-step reasoning use Sonnet. KR uses local embeddings — zero API cost.</p>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--amber2)">Statistical Gating</h3>
+      <p>Only ~5% of raw metric events exceed the 2.5σ threshold and proceed to LLM classification. The z-score gate eliminates noise before any tokens are spent.</p>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--amber2)">Redis Deduplication</h3>
+      <p>5-minute TTL dedup prevents re-processing identical anomalies. 30-minute active_incident lock prevents duplicate incidents. Both eliminate redundant LLM calls.</p>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--amber2)">Token Budget Enforcement</h3>
+      <p>KR Agent caps context at 4,096 tokens (prioritized by source type) before returning to Investigation Agent. Prevents runaway context windows in the RCA loop.</p>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--amber2)">max_tokens Caps</h3>
+      <p>Every LLM call specifies explicit <code>max_tokens</code>: Detection=200, Correlation=300, Investigation=4096, Remediation=2048, Postmortem passes=300–800 each.</p>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--amber2)">Focused Pass Design</h3>
+      <p>Postmortem 6-pass approach uses small, focused prompts rather than one large unconstrained prompt. Each pass has a strict output constraint — 2-3 sentences, ≤10 bullets, etc.</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ─── SECTION 14: Shared Library ────────────────────────────────────────── -->
+<section>
+<div class="container">
+  <div class="section-tag" style="background:rgba(100,116,139,.1);color:var(--muted)">Section 14</div>
+  <h2>Shared Library (shared/)</h2>
+  <p>All 7 agents and all 3 ingesters import from a single shared library at <code>/app/shared/</code> (mounted into each Docker container). This ensures consistent serialization, retry logic, and client patterns.</p>
+
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <h4>models.py — 20 Pydantic Event Models</h4>
+      <ul>
+        <li><strong>RawMetricEvent, RawLogEvent, RawDeploymentEvent</strong> — telemetry events</li>
+        <li><strong>AnomalyDetectedEvent</strong> — detection output with sigma, p50/p95/p99</li>
+        <li><strong>CorrelationSignal, IncidentOpenedEvent</strong> — correlation output</li>
+        <li><strong>RootCauseCandidate, DeploymentCorrelation, RCACompletedEvent</strong></li>
+        <li><strong>RemediationStep, RemediationPlanEvent</strong></li>
+        <li><strong>IncidentResolvedEvent, PostmortemGeneratedEvent, PostmortemDocument</strong></li>
+        <li><strong>KRRequest, KRResponse, KnowledgeChunk</strong> — KR pub/sub models</li>
+        <li><strong>ServiceInfo</strong> — service registry model</li>
+        <li>Enums: <code>EventType, Severity, AnomalyType, IncidentStatus, KRQueryType</code></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>kafka_client.py — Producer/Consumer/Replay</h4>
+      <ul>
+        <li><code>make_producer()</code> — confluent-kafka producer with linger_ms=10</li>
+        <li><code>make_consumer(topics, group_id, auto_offset_reset)</code></li>
+        <li><code>publish(producer, topic, data_dict, key)</code> — JSON serialize + produce</li>
+        <li><code>consume_loop(consumer, handler)</code> — poll loop with error handling</li>
+        <li><code>replay_window(topic, since_ms, until_ms, service_filter, max_messages)</code> — temporal seek</li>
+      </ul>
+      <h4 style="margin-top:1rem">llm_client.py — Claude API Wrapper</h4>
+      <ul>
+        <li><code>chat(system, user, model, max_tokens, temperature)</code> — single-turn with 3× retry + exponential backoff</li>
+        <li><code>run_tool_use_agent(system, prompt, tools, tool_executor, max_rounds=12)</code> — full agentic tool-use loop</li>
+        <li><code>extract_json_block(text)</code> — robust JSON extraction from markdown or bare JSON</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>redis_client.py — All Redis Patterns</h4>
+      <ul>
+        <li><code>push_metric(service, metric, value, max_len=50)</code> — LPUSH+LTRIM</li>
+        <li><code>get_metric_history(service, metric, count)</code> — LRANGE</li>
+        <li><code>set_dedup(key, ttl)</code> — SET NX with TTL</li>
+        <li><code>get/set_active_incident(service, incident_id, ttl)</code></li>
+        <li><code>delete_active_incident(service)</code> — on resolution</li>
+        <li><code>push/pop_kr_request(request_id, payload)</code> — BLPUSH/BLPOP</li>
+        <li><code>push/wait_kr_response(request_id, timeout)</code></li>
+        <li><code>get/set_failure_state(service)</code></li>
+        <li><code>incr(key, ttl)</code> — error burst counter</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>db_client.py — PostgreSQL CRUD</h4>
+      <ul>
+        <li><code>init_pool()</code> — psycopg2 ThreadedConnectionPool (1–10 connections)</li>
+        <li><code>insert_incident(id, data)</code> — initial detection insert</li>
+        <li><code>update_incident(id, updates)</code> — status + JSONB column updates</li>
+        <li><code>get_incident(id)</code> — full row fetch</li>
+        <li><code>log_agent_event(incident_id, agent, event_type, payload)</code></li>
+        <li><code>get_incident_timeline(incident_id)</code> — ordered agent_events</li>
+        <li><code>get_service_info(name), get_service_dependencies(name)</code></li>
+        <li><code>get_recent_deployments(services, since_ms, window)</code></li>
+        <li><code>insert_postmortem(...), log_email(...)</code></li>
+      </ul>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ─── Footer ─────────────────────────────────────────────────────────────── -->
+<footer style="padding:3rem 0;border-top:1px solid var(--border);margin-top:2rem">
+<div class="container" style="text-align:center">
+  <p style="color:var(--dim);font-size:.8rem">SRE Copilot Architecture Documentation · Generated 2026-06-20</p>
+  <p style="color:var(--dim);font-size:.75rem;margin-top:.4rem">
+    <a href="../README.md">README</a> &nbsp;·&nbsp;
+    <a href="index.html">Full Documentation</a> &nbsp;·&nbsp;
+    <a href="https://github.com/amudhan023/sre-copilot">GitHub</a>
+  </p>
+</div>
+</footer>
+
+</body>
+</html>

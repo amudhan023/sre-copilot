@@ -11,7 +11,7 @@
 
 **An autonomous AI system that detects production incidents, correlates multi-service failures, identifies root causes, and delivers structured remediation plans — before your on-call engineer unlocks their laptop.**
 
-[Quick Start](#quick-start) · [Architecture](#architecture) · [Agent Design](#agent-design) · [Tutorial](#in-depth-tutorial) · [Testing](#testing) · [Cost Analysis](#cost-analysis)
+[Quick Start](#quick-start) · [Architecture](#architecture) · [Agent Design](#agent-design) · [Tutorial](#in-depth-tutorial) · [Testing](#testing) · [Cost Analysis](#cost-analysis) · [**Deep Architecture Docs ↗**](docs/architecture.html)
 
 </div>
 
@@ -769,6 +769,9 @@ sre-copilot/
 │
 ├── application/sre-api/        # FastAPI dashboard + REST API
 ├── tests/                      # 108 unit tests + integration + e2e
+├── docs/
+│   ├── index.html              # Complete project documentation
+│   └── architecture.html       # Deep architecture + execution flow diagrams (14 sections, 12 SVG diagrams)
 ├── docker-compose.yml          # 26 services, health checks, startup order
 ├── Makefile                    # make demo, make test, make clean
 └── .env.example                # All configurable values documented
