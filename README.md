@@ -1,4 +1,4 @@
-<![CDATA[<div align="center">
+<div align="center">
 
 <img src="https://img.shields.io/badge/SRE-Copilot-1e293b?style=for-the-badge&logoColor=white" alt="SRE Copilot" height="42"/>
 
@@ -788,4 +788,3 @@ A single root cause can generate thousands of metric anomalies. Two complementar
 ## License
 
 MIT — contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for extension points.
-]]>
