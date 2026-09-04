@@ -17,6 +17,19 @@ async def main():
 
             tools = await session.list_tools()
 
+            result = await session.call_tool(
+                "get_metrics",
+                {
+                    "service": "payments-api",
+                    "metric": "cpu_usage",
+                    "start_time": "2026-09-04T10:00:00+00:00",
+                    "end_time": "2026-09-04T10:10:00+00:00",
+                },
+            )
+
+            print("\nTool result:")
+            print(result.content)
+
             print("Available tools:")
 
             for tool in tools.tools:
