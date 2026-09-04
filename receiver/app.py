@@ -5,8 +5,9 @@ from starlette.concurrency import run_in_threadpool
 import json
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
-
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 KAFKA_BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP", "localhost:29092")
 
