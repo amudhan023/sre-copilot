@@ -6,13 +6,25 @@ import json
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
 import os
+import hashlib
+import redis
 from dotenv import load_dotenv
+
 load_dotenv()
 
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 KAFKA_BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP", "localhost:29092")
 
 app = FastAPI()
 
+
+def create_fingerprint(tenant, service, alertname):
+    value = f"{tenant}:{service}:{alertname}"
+    return hashlib.sha256(value.encode()).hexdigest()
+
+@lru_cache(maxsize=1)
+def get_redis():
+    return redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
 @lru_cache(maxsize=1)
 def get_producer():
@@ -47,6 +59,31 @@ async def receive_alert(request: Request):
         "alertname": payload.get("commonLabels", {}).get("alertname"),
         "status": payload.get("status"),
     }
+    fingerprint = create_fingerprint(
+        tenant,
+        service,
+        incident["alertname"],
+    )
+
+    key = f"sre:dedup:{fingerprint}"
+
+    try:
+        is_new = get_redis().set(
+            key,
+            "1",
+            nx=True,
+            ex=300,
+        )
+
+        if not is_new:
+            return {"received": True, "duplicate": True}
+
+    except redis.RedisError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"redis unavailable: {e}",
+        )
+
     try:
         # kafka-python is sync: keep it off the event loop
         await run_in_threadpool(
