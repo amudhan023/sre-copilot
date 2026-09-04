@@ -1,5 +1,7 @@
 fastapi
 uvicorn
-kafka-python
 python-dotenv
+kafka-python
 redis
+httpx2
+mcp>=2
