@@ -6,15 +6,22 @@ import json
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
 
+import os
+
+KAFKA_BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP", "localhost:29092")
+
 app = FastAPI()
 
 
 @lru_cache(maxsize=1)
 def get_producer():
     return KafkaProducer(
-        bootstrap_servers="localhost:29092",
+        bootstrap_servers=KAFKA_BOOTSTRAP,
         value_serializer=lambda v: json.dumps(v).encode(),
-        max_block_ms=5000,  # ponytail: fail fast; raise if a slow broker starts flapping
+        # fail fast when the broker is down: bootstrap_timeout_ms governs the
+        # constructor, max_block_ms the send. Both needed.
+        bootstrap_timeout_ms=3000,
+        max_block_ms=3000,
     )
 
 
