@@ -1,9 +1,7 @@
 import os
 
-from dotenv import load_dotenv
 from google import genai
-
-load_dotenv()
+from google.genai import types
 
 
 client = genai.Client(
@@ -11,10 +9,52 @@ client = genai.Client(
 )
 
 
-def ask_gemini(prompt: str) -> str:
+get_metrics_declaration = {
+    "name": "get_metrics",
+    "description": "Query a metric for a service over a time range.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "service": {
+                "type": "string",
+                "description": "Name of the service",
+            },
+            "metric": {
+                "type": "string",
+                "description": "Metric to query",
+            },
+            "start_time": {
+                "type": "string",
+                "description": "Start time in ISO format",
+            },
+            "end_time": {
+                "type": "string",
+                "description": "End time in ISO format",
+            },
+        },
+        "required": [
+            "service",
+            "metric",
+            "start_time",
+            "end_time",
+        ],
+    },
+}
+
+
+def ask_gemini(prompt: str):
+    tool = types.Tool(
+        function_declarations=[get_metrics_declaration]
+    )
+
+    config = types.GenerateContentConfig(
+        tools=[tool]
+    )
+
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=prompt,
+        config=config,
     )
 
-    return response.text
+    return response
