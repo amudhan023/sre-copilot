@@ -34,7 +34,8 @@ async def main():
                 Investigate its CPU usage between
                 2026-09-04T10:00:00+00:00 and
                 2026-09-04T10:10:00+00:00.
-                """
+                """,
+                gemini_tool,
             )
 
             for part in response.candidates[0].content.parts:

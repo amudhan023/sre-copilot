@@ -49,11 +49,7 @@ def continue_gemini(contents):
 
     return response
 
-def ask_gemini(prompt: str):
-    tool = types.Tool(
-        function_declarations=[get_metrics_declaration]
-    )
-
+def ask_gemini(prompt: str, tool):
     config = types.GenerateContentConfig(
         tools=[tool]
     )
