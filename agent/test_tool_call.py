@@ -78,7 +78,11 @@ async def main():
                         "role": "user",
                         "parts": [
                             {
-                                "text": f"Here is the result from the get_metrics tool:\n{result.content}"
+                                "text": (
+                                       f"Here is the result from the "
+                                       f"{function_call.name} tool:\n"
+                                       f"{result.content}"
+                                )
                             }
                         ],
                     },
