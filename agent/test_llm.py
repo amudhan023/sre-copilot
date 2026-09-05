@@ -1,14 +1,8 @@
-from langchain_core.messages import HumanMessage
-
 from agent.llm import ask_gemini
 
 
-messages = [
-    HumanMessage(
-        content="Explain what LangGraph is in one sentence."
-    )
-]
+response = ask_gemini(
+    "Explain what an SRE incident is in one sentence."
+)
 
-response = ask_gemini(messages)
-
-print(response.content)
+print(response.text)
