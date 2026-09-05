@@ -88,7 +88,7 @@ async def main():
                     },
                 ]
 
-                final_response = continue_gemini(contents)
+                final_response = continue_gemini(contents, gemini_tool)
 
                 print("\nFinal Gemini response:")
                 print(final_response.text)
