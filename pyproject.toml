@@ -2,7 +2,24 @@
 name = "sre-copilot"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "python-dotenv",
+    "kafka-python",
+    "redis",
+    "httpx2",
+    "mcp>=2",
+    "google-genai",
+    "langgraph>=1.2.11",
+    "langchain-google-genai",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "httpx",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

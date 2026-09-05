@@ -9,7 +9,7 @@ def llm_node(state: AgentState, gemini_tool) -> AgentState:
     )
 
     return {
-        "messages": state["messages"] + [
+        "messages": [
             response.candidates[0].content
         ]
     }
@@ -29,7 +29,7 @@ async def tool_node(state: AgentState, session) -> AgentState:
         )
 
         return {
-            "messages": state["messages"] + [
+            "messages": [
                 {
                     "role": "user",
                     "parts": [
@@ -44,4 +44,5 @@ async def tool_node(state: AgentState, session) -> AgentState:
             ]
         }
 
-    return state
+    # Nothing to add; returning state would re-append the whole history.
+    return {"messages": []}
