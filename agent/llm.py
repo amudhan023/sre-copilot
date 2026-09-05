@@ -51,9 +51,9 @@ def continue_gemini(contents):
 
     return response
 
-def ask_gemini(prompt: str, tool):
+def ask_gemini(prompt: str, tool=None):
     config = types.GenerateContentConfig(
-        tools=[tool]
+        tools=[tool] if tool else None
     )
 
     response = client.models.generate_content(
