@@ -15,12 +15,23 @@ def route_after_llm(state: AgentState):
 
     return END
 
-def build_graph(gemini_tool, session):
+def build_graph(session, gemini_tool):
     graph = StateGraph(AgentState)
 
-    # LangGraph calls nodes with the state alone, so bind the rest.
-    graph.add_node("llm", partial(llm_node, gemini_tool=gemini_tool))
-    graph.add_node("tool", partial(tool_node, session=session))
+    def llm(state):
+        return llm_node(
+            state,
+            gemini_tool,
+        )
+
+    async def tool(state):
+        return await tool_node(
+            state,
+            session,
+        )
+
+    graph.add_node("llm", llm)
+    graph.add_node("tool", tool)
 
     graph.set_entry_point("llm")
 
