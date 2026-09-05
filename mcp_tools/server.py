@@ -3,9 +3,24 @@ from mcp.server.mcpserver import MCPServer
 from mcp_tools.metrics import query_metrics
 from mcp_tools.logs import search_logs
 from mcp_tools.traces import get_traces
+from mcp_tools.deployments import recent_deploys
+
 
 mcp = MCPServer("sre-tools")
 
+
+@mcp.tool()
+def search_recent_deploys(
+    service: str,
+    start_time: str,
+    end_time: str,
+) -> dict:
+    """Find recent deployments for a service over a time range."""
+    return recent_deploys(
+        service=service,
+        start_time=start_time,
+        end_time=end_time,
+    )
 
 @mcp.tool()
 def search_service_logs(
