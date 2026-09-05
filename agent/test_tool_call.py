@@ -46,6 +46,38 @@ async def main():
                 print("\nMCP tool result:")
                 print(result.content)
 
+                # Send the tool result back to Gemini.
+                contents = [
+                    {
+                        "role": "user",
+                        "parts": [
+                            {
+                                "text": """
+                                The payments-api service is having an incident.
+
+                                Investigate its CPU usage between
+                                2026-09-04T10:00:00+00:00 and
+                                2026-09-04T10:10:00+00:00.
+                                """
+                            }
+                        ],
+                    },
+                    response.candidates[0].content,
+                    {
+                        "role": "user",
+                        "parts": [
+                            {
+                                "text": f"Here is the result from the get_metrics tool:\n{result.content}"
+                            }
+                        ],
+                    },
+                ]
+
+                final_response = continue_gemini(contents)
+
+                print("\nFinal Gemini response:")
+                print(final_response.text)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
