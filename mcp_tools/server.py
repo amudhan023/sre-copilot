@@ -4,10 +4,23 @@ from mcp_tools.metrics import query_metrics
 from mcp_tools.logs import search_logs
 from mcp_tools.traces import get_traces
 from mcp_tools.deployments import recent_deploys
+from mcp_tools.incidents import find_similar_incidents
 
 
 mcp = MCPServer("sre-tools")
 
+
+
+@mcp.tool()
+def search_similar_incidents(
+    service: str,
+    query: str,
+) -> dict:
+    """Find incidents similar to the current incident."""
+    return find_similar_incidents(
+        service=service,
+        query=query,
+    )
 
 @mcp.tool()
 def search_recent_deploys(
