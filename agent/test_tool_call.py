@@ -3,6 +3,8 @@ import asyncio
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from agent.llm import ask_gemini, continue_gemini
+from agent.tools import mcp_tools_to_gemini
+
 
 async def main():
     # Start our MCP server as a subprocess.
@@ -14,7 +16,16 @@ async def main():
     async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
+            mcp_result = await session.list_tools()
 
+            gemini_tool = mcp_tools_to_gemini(
+                mcp_result.tools
+            )
+
+            print("MCP tools exposed to Gemini:")
+
+            for tool in mcp_result.tools:
+                print(f"- {tool.name}")
             # Ask Gemini to decide whether it needs the tool.
             response = ask_gemini(
                 """
