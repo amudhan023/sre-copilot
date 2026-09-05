@@ -6,3 +6,4 @@ redis
 httpx2
 mcp>=2
 google-genai
+langgraph
