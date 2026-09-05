@@ -2,6 +2,13 @@ from agent.llm import ask_gemini, continue_gemini
 
 
 async def run_agent(session, prompt: str, gemini_tool):
+    messages = [
+        {
+            "role": "user",
+            "parts": [{"text": prompt}],
+        }
+    ]
+
     response = ask_gemini(prompt, gemini_tool)
 
     while True:
@@ -12,9 +19,12 @@ async def run_agent(session, prompt: str, gemini_tool):
                 function_call = part.function_call
                 break
 
-        # Gemini has finished reasoning.
+        # Gemini is finished.
         if function_call is None:
             return response
+
+        # Keep Gemini's response in the history.
+        messages.append(response.candidates[0].content)
 
         # Execute the requested MCP tool.
         result = await session.call_tool(
@@ -22,13 +32,10 @@ async def run_agent(session, prompt: str, gemini_tool):
             dict(function_call.args),
         )
 
-        # Add the tool result to the conversation.
-        contents = [
-            {
-                "role": "user",
-                "parts": [{"text": prompt}],
-            },
-            response.candidates[0].content,
+        print(f"Calling tool: {function_call.name}")
+
+        # Keep the tool result in the history.
+        messages.append(
             {
                 "role": "user",
                 "parts": [
@@ -39,8 +46,8 @@ async def run_agent(session, prompt: str, gemini_tool):
                         )
                     }
                 ],
-            },
-        ]
+            }
+        )
 
-        # Ask Gemini what to do next.
-        response = continue_gemini(contents)
+        # Ask Gemini again using the accumulated history.
+        response = continue_gemini(messages)
