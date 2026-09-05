@@ -18,7 +18,7 @@ def route_after_llm(state: AgentState):
 def build_graph(session, gemini_tool):
     graph = StateGraph(AgentState)
 
-    def llm(state):
+    async def llm(state):
         return llm_node(
             state,
             gemini_tool,
