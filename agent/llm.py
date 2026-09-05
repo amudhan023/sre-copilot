@@ -10,6 +10,9 @@ client = genai.Client(
     api_key=os.environ["GEMINI_API_KEY"]
 )
 
+# Free-tier rate limits are per model. Override to switch budgets.
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
+
 
 get_metrics_declaration = {
     "name": "get_metrics",
@@ -50,7 +53,7 @@ def ask_gemini(prompt: str, tool=None):
     )
 
     return client.models.generate_content(
-        model="gemini-2.5-flash",
+        model=MODEL,
         contents=prompt,
         config=config,
     )
@@ -62,7 +65,7 @@ def continue_gemini(contents, tool):
     )
 
     return client.models.generate_content(
-        model="gemini-2.5-flash",
+        model=MODEL,
         contents=contents,
         config=config,
     )
