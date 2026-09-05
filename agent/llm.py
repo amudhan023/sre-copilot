@@ -43,23 +43,26 @@ get_metrics_declaration = {
     },
 }
 
-def continue_gemini(contents):
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=contents,
-    )
-
-    return response
 
 def ask_gemini(prompt: str, tool=None):
     config = types.GenerateContentConfig(
         tools=[tool] if tool else None
     )
 
-    response = client.models.generate_content(
+    return client.models.generate_content(
         model="gemini-2.5-flash",
         contents=prompt,
         config=config,
     )
 
-    return response
+
+def continue_gemini(contents, tool):
+    config = types.GenerateContentConfig(
+        tools=[tool]
+    )
+
+    return client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=contents,
+        config=config,
+    )

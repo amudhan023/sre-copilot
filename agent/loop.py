@@ -5,11 +5,18 @@ async def run_agent(session, prompt: str, gemini_tool):
     messages = [
         {
             "role": "user",
-            "parts": [{"text": prompt}],
+            "parts": [
+                {
+                    "text": prompt
+                }
+            ],
         }
     ]
 
-    response = ask_gemini(prompt, gemini_tool)
+    response = ask_gemini(
+        prompt,
+        gemini_tool,
+    )
 
     while True:
         function_call = None
@@ -19,22 +26,27 @@ async def run_agent(session, prompt: str, gemini_tool):
                 function_call = part.function_call
                 break
 
-        # Gemini is finished.
+        # Gemini has finished reasoning and doesn't need another tool.
         if function_call is None:
             return response
 
-        # Keep Gemini's response in the history.
-        messages.append(response.candidates[0].content)
+        print(f"Calling tool: {function_call.name}")
+        print(f"Arguments: {function_call.args}")
 
-        # Execute the requested MCP tool.
+        # Application executes the MCP tool.
         result = await session.call_tool(
             function_call.name,
             dict(function_call.args),
         )
 
-        print(f"Calling tool: {function_call.name}")
+        print(f"Tool result: {result.content}")
 
-        # Keep the tool result in the history.
+        # Remember Gemini's previous response.
+        messages.append(
+            response.candidates[0].content
+        )
+
+        # Remember the tool result.
         messages.append(
             {
                 "role": "user",
@@ -49,5 +61,8 @@ async def run_agent(session, prompt: str, gemini_tool):
             }
         )
 
-        # Ask Gemini again using the accumulated history.
-        response = continue_gemini(messages)
+        # Ask Gemini what to do next.
+        response = continue_gemini(
+            messages,
+            gemini_tool,
+        )
