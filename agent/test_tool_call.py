@@ -3,7 +3,7 @@ import asyncio
 from agent.llm import ask_gemini
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-
+from agent.llm import ask_gemini, continue_gemini
 
 async def main():
     # Start our MCP server as a subprocess.
