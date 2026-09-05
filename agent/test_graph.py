@@ -1,4 +1,5 @@
 import asyncio
+import sys
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -9,7 +10,7 @@ from agent.tools import mcp_tools_to_gemini
 
 async def main():
     server_params = StdioServerParameters(
-        command="python",
+        command=sys.executable,
         args=["-m", "mcp_tools.server"],
     )
 
