@@ -1,214 +1,145 @@
+"""
+Hybrid retrieval for the SRE Copilot knowledge base.
+
+This module combines PostgreSQL/pgvector dense retrieval with PostgreSQL
+full-text sparse retrieval and merges their ranked results using Reciprocal
+Rank Fusion (RRF).
+
+Important implementation details:
+- Dense retrieval uses BGE-M3 embeddings and pgvector cosine distance.
+- Sparse retrieval uses the indexed PostgreSQL TSVECTOR column.
+- Every database retrieval path requires a tenant filter.
+- RRF combines rankings, not raw dense/sparse scores.
+- Cross-encoder reranking is kept separate in reranker.py and will consume
+  the RRF candidate set in the next step.
+"""
+
+from collections.abc import Iterable
+
 from mcp_tools.rag.embeddings import BGE3Embeddings
-from mcp_tools.rag.store import get_connection
+from mcp_tools.rag.store import dense_search, sparse_search
 
-"""
-Hybrid retrieval for the SRE Copilot RAG system.
 
-Purpose:
-    Retrieves relevant historical incident chunks using two complementary
-    search strategies:
-      1. Dense semantic search using BGE-M3 embeddings + pgvector.
-      2. Sparse lexical search using PostgreSQL full-text search.
+DEFAULT_RRF_K = 60
 
-High-level flow:
-    Query
-      -> Dense retrieval
-      -> Sparse retrieval
-      -> Reciprocal Rank Fusion (RRF)
-      -> Top candidate chunks
 
-Important:
-    The sparse search currently uses PostgreSQL tsvector/FTS. It is NOT
-    BGE-M3's learned sparse lexical weights.
+def reciprocal_rank_fusion(
+    ranked_lists: Iterable[list[dict]],
+    k: int = DEFAULT_RRF_K,
+) -> list[dict]:
+    """Fuse ranked results by stable chunk_id using Reciprocal Rank Fusion."""
+    if k <= 0:
+        raise ValueError("k must be greater than zero")
 
-    RRF combines rankings rather than directly comparing dense and sparse
-    scores, because the two search systems produce different score scales.
+    candidates: dict[str, dict] = {}
 
-    This file only retrieves candidates. Cross-encoder reranking happens
-    separately in reranker.py.
+    for ranked_list in ranked_lists:
+        for rank, result in enumerate(ranked_list, start=1):
+            chunk_id = result["chunk_id"]
+            candidate = candidates.setdefault(
+                chunk_id,
+                {**result, "rrf_score": 0.0},
+            )
+            candidate["rrf_score"] += 1.0 / (k + rank)
 
-Future:
-    The retriever can later be extended with additional filters such as
-    document type, environment, time range, and tenant.
-"""
+            if "dense_rank" in result:
+                candidate["dense_rank"] = rank
+            if "sparse_rank" in result:
+                candidate["sparse_rank"] = rank
 
-# imports...
+    return sorted(
+        candidates.values(),
+        key=lambda result: result["rrf_score"],
+        reverse=True,
+    )
+
 
 class HybridRetriever:
-    def __init__(self):
-        self.embedder = BGE3Embeddings()
+    """Run dense + sparse retrieval and return RRF-ranked candidates."""
+
+    def __init__(self, embedder: BGE3Embeddings | None = None):
+        self.embedder = embedder or BGE3Embeddings()
 
     def dense_search(
         self,
         query: str,
-        service: str | None = None,
+        tenant: str,
         limit: int = 20,
-    ):
+    ) -> list[dict]:
+        """Embed a query and execute tenant-scoped dense retrieval."""
         embedding = self.embedder.encode([query])["dense"][0]
-
-        sql = """
-            SELECT
-                id,
-                document_id,
-                chunk_id,
-                chunk_index,
-                service,
-                document_type,
-                title,
-                content,
-                1 - (embedding <=> %s) AS score
-            FROM rag_chunks
-            WHERE embedding IS NOT NULL
-        """
-
-        params = [embedding]
-
-        if service:
-            sql += " AND service = %s"
-            params.append(service)
-
-        sql += """
-            ORDER BY embedding <=> %s
-            LIMIT %s
-        """
-
-        params.extend([embedding, limit])
-
-        with get_connection() as connection:
-            rows = connection.execute(sql, params).fetchall()
-
+        results = dense_search(
+            query_embedding=embedding,
+            tenant=tenant,
+            limit=limit,
+        )
         return [
-            {
-                "id": row[0],
-                "document_id": row[1],
-                "chunk_id": row[2],
-                "chunk_index": row[3],
-                "service": row[4],
-                "document_type": row[5],
-                "title": row[6],
-                "content": row[7],
-                "score": float(row[8]),
-            }
-            for row in rows
+            {**result, "dense_rank": rank}
+            for rank, result in enumerate(results, start=1)
         ]
 
     def sparse_search(
         self,
         query: str,
-        service: str | None = None,
+        tenant: str,
         limit: int = 20,
-    ):
-        sql = """
-            SELECT
-                id,
-                document_id,
-                chunk_id,
-                chunk_index,
-                service,
-                document_type,
-                title,
-                content,
-                ts_rank_cd(
-                    search_vector,
-                    websearch_to_tsquery('english', %s)
-                ) AS score
-            FROM rag_chunks
-            WHERE search_vector @@
-                websearch_to_tsquery('english', %s)
-        """
-
-        params = [query, query]
-
-        if service:
-            sql += " AND service = %s"
-            params.append(service)
-
-        sql += """
-            ORDER BY score DESC
-            LIMIT %s
-        """
-
-        params.append(limit)
-
-        with get_connection() as connection:
-            rows = connection.execute(sql, params).fetchall()
-
+    ) -> list[dict]:
+        """Execute tenant-scoped PostgreSQL full-text retrieval."""
+        results = sparse_search(
+            query=query,
+            tenant=tenant,
+            limit=limit,
+        )
         return [
-            {
-                "id": row[0],
-                "document_id": row[1],
-                "chunk_id": row[2],
-                "chunk_index": row[3],
-                "service": row[4],
-                "document_type": row[5],
-                "title": row[6],
-                "content": row[7],
-                "score": float(row[8]),
-            }
-            for row in rows
+            {**result, "sparse_rank": rank}
+            for rank, result in enumerate(results, start=1)
         ]
 
     def hybrid_search(
         self,
         query: str,
-        service: str | None = None,
-        limit: int = 5,
+        tenant: str,
+        limit: int = 20,
         candidate_limit: int = 20,
-    ):
+    ) -> list[dict]:
+        """Return the top RRF candidates from dense and sparse retrieval."""
         dense = self.dense_search(
             query,
-            service=service,
+            tenant=tenant,
             limit=candidate_limit,
         )
-
         sparse = self.sparse_search(
             query,
-            service=service,
+            tenant=tenant,
             limit=candidate_limit,
         )
+        return reciprocal_rank_fusion([dense, sparse])[:limit]
 
-        fused = {}
-
-        rrf_k = 60
-
-        for rank, result in enumerate(dense, start=1):
-            chunk_id = result["chunk_id"]
-
-            fused.setdefault(
-                chunk_id,
-                {
-                    **result,
-                    "dense_rank": rank,
-                    "sparse_rank": None,
-                    "rrf_score": 0.0,
-                },
-            )
-
-            fused[chunk_id]["rrf_score"] += (
-                1 / (rrf_k + rank)
-            )
-
-        for rank, result in enumerate(sparse, start=1):
-            chunk_id = result["chunk_id"]
-
-            if chunk_id not in fused:
-                fused[chunk_id] = {
-                    **result,
-                    "dense_rank": None,
-                    "sparse_rank": rank,
-                    "rrf_score": 0.0,
-                }
-
-            fused[chunk_id]["sparse_rank"] = rank
-
-            fused[chunk_id]["rrf_score"] += (
-                1 / (rrf_k + rank)
-            )
-
-        results = sorted(
-            fused.values(),
-            key=lambda item: item["rrf_score"],
-            reverse=True,
+    def retrieve(
+        self,
+        query: str,
+        tenant: str,
+        dense_limit: int = 20,
+        sparse_limit: int = 20,
+        rrf_limit: int = 20,
+    ) -> dict:
+        """Return both raw ranked lists and the fused RRF candidate list."""
+        dense = self.dense_search(
+            query,
+            tenant=tenant,
+            limit=dense_limit,
         )
+        sparse = self.sparse_search(
+            query,
+            tenant=tenant,
+            limit=sparse_limit,
+        )
+        rrf = reciprocal_rank_fusion([dense, sparse])[:rrf_limit]
 
-        return results[:limit]
+        return {
+            "query": query,
+            "tenant": tenant,
+            "dense": dense,
+            "sparse": sparse,
+            "rrf": rrf,
+        }
