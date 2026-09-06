@@ -1,3 +1,5 @@
+import asyncio
+
 from agent.llm import continue_gemini
 from agent.state import AgentState
 
@@ -17,32 +19,40 @@ def llm_node(state: AgentState, gemini_tool) -> AgentState:
 async def tool_node(state: AgentState, session) -> AgentState:
     last_message = state["messages"][-1]
 
-    for part in last_message.parts:
-        if not part.function_call:
-            continue
+    tool_calls = [
+        part.function_call
+        for part in last_message.parts
+        if part.function_call
+    ]
 
-        function_call = part.function_call
+    if not tool_calls:
+        return state
 
-        result = await session.call_tool(
-            function_call.name,
-            dict(function_call.args),
-        )
+    results = await asyncio.gather(
+        *[
+            session.call_tool(
+                call.name,
+                dict(call.args),
+            )
+            for call in tool_calls
+        ]
+    )
 
-        return {
-            "messages": [
-                {
-                    "role": "user",
-                    "parts": [
-                        {
-                            "text": (
-                                f"Result from {function_call.name}:\n"
-                                f"{result.content}"
-                            )
-                        }
-                    ],
-                }
-            ]
+    tool_results = [
+        {
+            "text": (
+                f"Result from {call.name}:\n"
+                f"{result.content}"
+            )
         }
+        for call, result in zip(tool_calls, results)
+    ]
 
-    # Nothing to add; returning state would re-append the whole history.
-    return {"messages": []}
+    return {
+        "messages": state["messages"] + [
+            {
+                "role": "user",
+                "parts": tool_results,
+            }
+        ]
+    }

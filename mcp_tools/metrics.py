@@ -1,4 +1,13 @@
+import os
 from datetime import datetime
+
+import httpx
+
+
+PROMETHEUS_URL = os.environ.get(
+    "PROMETHEUS_URL",
+    "http://localhost:9090",
+)
 
 
 def query_metrics(
@@ -7,17 +16,27 @@ def query_metrics(
     start_time: datetime,
     end_time: datetime,
 ) -> dict:
-    """
-    Query metrics for a service within a time range.
+    query = f'{metric}{{service="{service}"}}'
 
-    This is intentionally a simple implementation for now.
-    Later, this function will query Prometheus through MCP.
-    """
+    response = httpx.get(
+        f"{PROMETHEUS_URL}/api/v1/query_range",
+        params={
+            "query": query,
+            "start": start_time.timestamp(),
+            "end": end_time.timestamp(),
+            "step": 15,
+        },
+        timeout=10,
+    )
+
+    response.raise_for_status()
+
+    payload = response.json()
 
     return {
         "service": service,
         "metric": metric,
         "start_time": start_time.isoformat(),
         "end_time": end_time.isoformat(),
-        "data": [],
+        "data": payload["data"]["result"],
     }

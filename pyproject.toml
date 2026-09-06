@@ -9,6 +9,7 @@ dependencies = [
     "kafka-python",
     "redis",
     "httpx2",
+    "httpx",
     "mcp>=2",
     "google-genai",
     "langgraph>=1.2.11",
