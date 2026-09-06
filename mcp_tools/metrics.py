@@ -9,6 +9,9 @@ PROMETHEUS_URL = os.environ.get(
     "http://localhost:9090",
 )
 
+# Talks to Prometheus for the two things the agent needs: listing what
+# metrics exist for a service, and querying one metric over a time range.
+
 
 def query_metrics(
     service: str,
@@ -40,3 +43,22 @@ def query_metrics(
         "end_time": end_time.isoformat(),
         "data": payload["data"]["result"],
     }
+
+def list_available_metrics(service: str) -> list[str]:
+    response = httpx.get(
+        f"{PROMETHEUS_URL}/api/v1/series",
+        params={
+            "match[]": f'{{service="{service}"}}',
+        },
+        timeout=10,
+    )
+
+    response.raise_for_status()
+
+    payload = response.json()
+
+    return sorted({
+        series["__name__"]
+        for series in payload["data"]
+        if "__name__" in series
+    })

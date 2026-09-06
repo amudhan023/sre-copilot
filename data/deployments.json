@@ -1,0 +1,16 @@
+[
+  {
+    "timestamp": "2026-09-04T09:55:00+00:00",
+    "service": "payment-api",
+    "version": "v2.4.1",
+    "environment": "production",
+    "deployed_by": "jenkins"
+  },
+  {
+    "timestamp": "2026-09-03T18:30:00+00:00",
+    "service": "payment-api",
+    "version": "v2.4.0",
+    "environment": "production",
+    "deployed_by": "jenkins"
+  }
+]

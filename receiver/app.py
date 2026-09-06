@@ -1,4 +1,3 @@
-# receiver/app.py
 from fastapi import FastAPI, Request, HTTPException
 from functools import lru_cache
 from starlette.concurrency import run_in_threadpool
@@ -16,6 +15,16 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 KAFKA_BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP", "localhost:29092")
 
 app = FastAPI()
+
+# The front door for incoming alerts (Alertmanager-style webhooks). Its main
+# job is deduplication: Alertmanager can fire the same alert repeatedly, so
+# we hash tenant+service+alertname into a fingerprint and store it in Redis
+# with a 5-minute TTL (nx=True means "only set if it doesn't already exist").
+# If the key already exists, this alert is a repeat and gets dropped. If it's
+# genuinely new, we publish it as an incident onto the Kafka "incidents"
+# topic for the rest of the pipeline to pick up. Kafka's client is
+# synchronous, so the send is pushed onto a thread pool to avoid blocking
+# FastAPI's async event loop.
 
 
 def create_fingerprint(tenant, service, alertname):

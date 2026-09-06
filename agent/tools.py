@@ -1,5 +1,8 @@
 from google.genai import types
 
+# Converts the tool list we get from the MCP server into the shape Gemini's
+# function-calling API expects: a single Tool made up of FunctionDeclarations.
+
 
 def mcp_tools_to_gemini(mcp_tools):
     declarations = []

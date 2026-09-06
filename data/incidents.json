@@ -1,0 +1,16 @@
+[
+  {
+    "incident_id": "INC-1042",
+    "service": "payment-api",
+    "summary": "Payment failures caused by database connection pool exhaustion",
+    "root_cause": "Database connection timeout caused connection pool exhaustion",
+    "resolution": "Increased database connection pool and fixed slow queries"
+  },
+  {
+    "incident_id": "INC-0987",
+    "service": "payment-api",
+    "summary": "High payment latency and database timeouts",
+    "root_cause": "Slow database queries exhausted available connections",
+    "resolution": "Optimized database queries and restarted affected instances"
+  }
+]

@@ -5,6 +5,13 @@ from langgraph.graph import StateGraph, END
 from agent.state import AgentState
 from agent.nodes import llm_node, tool_node
 
+# This wires up the LangGraph state machine that drives the investigation.
+# It's a simple two-node loop: "llm" decides what to do next (answer, or call
+# a tool), and "tool" runs whatever tool the LLM asked for. After a tool call
+# we always go back to "llm" so it can look at the result and decide again.
+# The loop only ends when the LLM's latest message has no tool calls left in
+# it, which is what route_after_llm checks below.
+
 
 def route_after_llm(state: AgentState):
     last_message = state["messages"][-1]

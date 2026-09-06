@@ -7,6 +7,11 @@ from mcp.client.stdio import stdio_client
 from agent.graph import build_graph
 from agent.tools import mcp_tools_to_gemini
 
+# Manual end-to-end script (not a pytest test, despite the filename). It
+# spins up the real MCP server as a subprocess, builds the Gemini tool
+# definitions from it, builds the LangGraph graph, and runs one hardcoded
+# incident through the whole thing so you can eyeball the final RCA output.
+
 
 async def main():
     server_params = StdioServerParameters(
@@ -38,7 +43,7 @@ async def main():
                         "parts": [
                             {
                                 "text": """
-                                The payments-api service is having
+                                The payment-api service is having
                                 high CPU usage.
 
                                 Investigate CPU usage between

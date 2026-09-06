@@ -3,6 +3,12 @@ import asyncio
 from agent.llm import continue_gemini
 from agent.state import AgentState
 
+# The two LangGraph nodes that make up the investigation loop. llm_node asks
+# the LLM what to do next and hands back its response as-is. tool_node looks
+# at the LLM's last message, runs every tool call it contains in parallel
+# (via asyncio.gather), and turns each result into a plain text message the
+# LLM can read on its next turn.
+
 
 def llm_node(state: AgentState, gemini_tool) -> AgentState:
     response = continue_gemini(
@@ -26,7 +32,7 @@ async def tool_node(state: AgentState, session) -> AgentState:
     ]
 
     if not tool_calls:
-        return state
+        return {"messages": []}
 
     results = await asyncio.gather(
         *[
@@ -49,7 +55,7 @@ async def tool_node(state: AgentState, session) -> AgentState:
     ]
 
     return {
-        "messages": state["messages"] + [
+        "messages": [
             {
                 "role": "user",
                 "parts": tool_results,

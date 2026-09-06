@@ -1,0 +1,32 @@
+[
+  {
+    "timestamp": "2026-09-04T10:01:12+00:00",
+    "service": "payment-api",
+    "level": "INFO",
+    "message": "Request completed successfully"
+  },
+  {
+    "timestamp": "2026-09-04T10:02:31+00:00",
+    "service": "payment-api",
+    "level": "ERROR",
+    "message": "Database connection timeout"
+  },
+  {
+    "timestamp": "2026-09-04T10:02:35+00:00",
+    "service": "payment-api",
+    "level": "WARN",
+    "message": "Database connection pool exhausted"
+  },
+  {
+    "timestamp": "2026-09-04T10:03:10+00:00",
+    "service": "payment-api",
+    "level": "ERROR",
+    "message": "Failed to process payment request"
+  },
+  {
+    "timestamp": "2026-09-04T10:04:22+00:00",
+    "service": "payment-api",
+    "level": "INFO",
+    "message": "Database connection recovered"
+  }
+]

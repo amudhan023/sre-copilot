@@ -1,6 +1,6 @@
 from datetime import datetime
 from mcp.server.mcpserver import MCPServer
-from mcp_tools.metrics import query_metrics
+from mcp_tools.metrics import query_metrics, list_available_metrics
 from mcp_tools.logs import search_logs
 from mcp_tools.traces import get_traces
 from mcp_tools.deployments import recent_deploys
@@ -9,6 +9,10 @@ from mcp_tools.incidents import find_similar_incidents
 
 mcp = MCPServer("sre-tools")
 
+# The MCP server. Each @mcp.tool() function below is one tool the LLM can
+# call while investigating an incident - metrics, logs, traces, deployments,
+# and similar incidents. This file is mostly a thin wrapper: the real logic
+# for each tool lives in its own module (metrics.py, logs.py, traces.py, etc).
 
 
 @mcp.tool()
@@ -51,6 +55,10 @@ def search_service_logs(
         end_time=end_time,
     )
 
+@mcp.tool()
+def list_metrics(service: str) -> list[str]:
+    """List metric names available for a service in Prometheus."""
+    return list_available_metrics(service)
 
 @mcp.tool()
 def get_metrics(

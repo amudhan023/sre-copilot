@@ -2,6 +2,12 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 from receiver.app import app
 
+# Tests the alert receiver end to end through FastAPI's TestClient: health
+# check, request validation, successful publish to Kafka, Kafka being down,
+# and the dedup path (posting the same alert twice should only publish once).
+# Redis and Kafka are mocked/patched out so these tests don't need either
+# service running.
+
 client = TestClient(app)
 
 
