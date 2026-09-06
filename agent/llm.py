@@ -13,19 +13,6 @@ client = genai.Client(
     api_key=os.environ["GEMINI_API_KEY"]
 )
 
-
-def ask_gemini(prompt: str, tool=None):
-    config = types.GenerateContentConfig(
-        tools=[tool] if tool else None
-    )
-
-    return client.models.generate_content(
-        model=MODEL,
-        contents=prompt,
-        config=config,
-    )
-
-
 def continue_gemini(contents, tool):
     config = types.GenerateContentConfig(
         tools=[tool]
