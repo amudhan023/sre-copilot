@@ -1,4 +1,4 @@
-from mcp_tools.traces import get_traces
+from sre_copilot.mcp_tools.traces import get_traces
 
 # Tests get_traces' operation filtering: an empty operation should match
 # every operation for the service (so the agent can discover what

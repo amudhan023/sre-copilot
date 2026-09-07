@@ -3,7 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-DEPLOYMENT_FILE = Path(__file__).parent.parent / "data" / "deployments.json"
+DEPLOYMENT_FILE = Path(__file__).resolve().parents[3] / "data" / "deployments.json"
 
 # Looks up recent deployments for a service from the local deployments.json
 # fixture, filtered to a time window. Stands in for a real deployment/CD

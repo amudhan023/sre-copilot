@@ -5,9 +5,9 @@ import httpx
 import pytest
 from google.genai import types
 
-from agent import llm
+from sre_copilot.agent import llm
 
-# Tests the Gemini/Groq provider layer in agent/llm.py: picking a provider
+# Tests the Gemini/Groq provider layer in sre_copilot/agent/llm.py: picking a provider
 # from env config, falling back from Gemini to Groq on transient failures,
 # translating between Gemini's native message/tool-call shapes and Groq's
 # OpenAI-compatible ones, and the payload-capping logic that keeps oversized
