@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import inspect
 import json
 import os
 from pathlib import Path
@@ -26,6 +27,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 
 from sre_copilot.rag.evaluation.ragas_compat import patch_ragas_vertexai_imports
@@ -35,8 +37,10 @@ from sre_copilot.rag.evaluation.ragas_compat import patch_ragas_vertexai_imports
 # patch before importing anything from Ragas.
 patch_ragas_vertexai_imports()
 
+import instructor
 from ragas import EvaluationDataset
-from ragas.llms import llm_factory
+from ragas.embeddings import GoogleEmbeddings
+from ragas.llms import InstructorLLM
 from ragas.metrics.collections import (
     AnswerRelevancy,
     ContextPrecision,
@@ -69,6 +73,43 @@ is insufficient rather than guessing.
 Give a concise, technically precise answer. Distinguish historical incident
 facts from inference when the question asks for a cause or resolution.
 """
+
+RETRY_ATTEMPTS = int(os.getenv("RAG_EVAL_RETRY_ATTEMPTS", "5"))
+RETRY_BASE_DELAY = float(os.getenv("RAG_EVAL_RETRY_BASE_DELAY", "4"))
+RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    """Detect transient Gemini failures (overload, rate limit, gateway errors).
+
+    A full run makes dozens of Gemini calls, and the free tier regularly answers
+    one of them with 503 "high demand". Instructor re-raises those wrapped, so
+    walk the __cause__ chain rather than only checking the outermost exception.
+    """
+    seen = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        status = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+        if isinstance(exc, genai_errors.APIError) and status in RETRYABLE_STATUS_CODES:
+            return True
+        exc = exc.__cause__
+    return False
+
+
+async def _retry_async(description: str, call):
+    """Await call(), retrying transient Gemini errors with exponential backoff."""
+    for attempt in range(1, RETRY_ATTEMPTS + 1):
+        try:
+            return await call()
+        except Exception as exc:
+            if attempt == RETRY_ATTEMPTS or not _is_retryable(exc):
+                raise
+            delay = RETRY_BASE_DELAY * 2 ** (attempt - 1)
+            print(
+                f"  {description} hit a transient Gemini error "
+                f"(attempt {attempt}/{RETRY_ATTEMPTS}), retrying in {delay:.0f}s"
+            )
+            await asyncio.sleep(delay)
 
 
 def _gemini_client() -> genai.Client:
@@ -160,18 +201,25 @@ async def evaluate_with_ragas(
 
     client = _gemini_client()
     model = os.getenv("RAGAS_MODEL", os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"))
-    evaluator_llm = llm_factory(
-        model,
+    # llm_factory() would patch the Gemini client with instructor in sync mode,
+    # and the collections metrics only expose an async ascore(). Building the
+    # InstructorLLM directly lets us ask instructor for an async client.
+    evaluator_llm = InstructorLLM(
+        client=instructor.from_genai(client, use_async=True),
+        model=model,
         provider="google",
-        client=client,
         temperature=0.0,
+    )
+    evaluator_embeddings = GoogleEmbeddings(
+        client=client,
+        model=os.getenv("RAGAS_EMBEDDING_MODEL", "gemini-embedding-001"),
     )
 
     metrics = {
         "context_precision": ContextPrecision(llm=evaluator_llm),
         "context_recall": ContextRecall(llm=evaluator_llm),
         "faithfulness": Faithfulness(llm=evaluator_llm),
-        "answer_relevancy": AnswerRelevancy(llm=evaluator_llm),
+        "answer_relevancy": AnswerRelevancy(llm=evaluator_llm, embeddings=evaluator_embeddings),
         "factual_correctness": FactualCorrectness(llm=evaluator_llm),
     }
 
@@ -194,7 +242,15 @@ async def evaluate_with_ragas(
         reasons = {}
 
         for name, metric in metrics.items():
-            metric_result = await metric.ascore(**kwargs)
+            # Each collections metric only accepts a subset of these fields
+            # (e.g. FactualCorrectness has no retrieved_contexts argument), so
+            # pass only the ones its ascore() signature actually declares.
+            accepted = inspect.signature(metric.ascore).parameters
+            metric_kwargs = {k: v for k, v in kwargs.items() if k in accepted}
+            metric_result = await _retry_async(
+                f"[{case.case_id}] {name}",
+                lambda m=metric, mk=metric_kwargs: m.ascore(**mk),
+            )
             case_scores[name] = _metric_score(metric_result)
             reason = getattr(metric_result, "reason", None)
             if reason:
@@ -262,10 +318,11 @@ async def async_main(args: argparse.Namespace) -> None:
 
     client = _gemini_client()
     for result in results:
-        result["response"] = generate_answer(
-            client,
-            result["question"],
-            result["contexts"],
+        result["response"] = await _retry_async(
+            f"[{result['case_id']}] answer generation",
+            lambda r=result: asyncio.to_thread(
+                generate_answer, client, r["question"], r["contexts"]
+            ),
         )
 
     ragas_results = await evaluate_with_ragas(cases, results)
