@@ -1,0 +1,38 @@
+[
+  {
+    "id": "payment-root-cause-001",
+    "question": "Why did payment-api experience database connection failures?",
+    "reference_answer": "The database connection timeout caused the database connection pool to become exhausted. The incident was resolved by increasing the database connection pool and fixing slow queries.",
+    "relevant_document_ids": ["INC-1042"]
+  },
+  {
+    "id": "payment-resolution-001",
+    "question": "How was the payment-api connection pool exhaustion incident resolved?",
+    "reference_answer": "The team increased the database connection pool and fixed the slow queries that were contributing to the connection timeout and pool exhaustion.",
+    "relevant_document_ids": ["INC-1042"]
+  },
+  {
+    "id": "payment-latency-001",
+    "question": "What caused the high payment latency and database timeouts?",
+    "reference_answer": "Slow database queries exhausted the available database connections, causing high payment latency and database timeouts.",
+    "relevant_document_ids": ["INC-0987"]
+  },
+  {
+    "id": "payment-resolution-002",
+    "question": "How was the high payment latency incident resolved?",
+    "reference_answer": "The incident was resolved by optimizing the database queries and restarting the affected instances.",
+    "relevant_document_ids": ["INC-0987"]
+  },
+  {
+    "id": "payment-compare-001",
+    "question": "What common database problem appears in the two historical payment-api incidents?",
+    "reference_answer": "Both incidents involve database-related resource pressure: slow database queries contributed to exhausted database connections, while a database connection timeout caused connection pool exhaustion.",
+    "relevant_document_ids": ["INC-1042", "INC-0987"]
+  },
+  {
+    "id": "payment-remediation-001",
+    "question": "What remediation actions were taken across the two historical payment-api incidents?",
+    "reference_answer": "The incidents were remediated by increasing the database connection pool, fixing or optimizing slow database queries, and restarting affected instances.",
+    "relevant_document_ids": ["INC-1042", "INC-0987"]
+  }
+]
