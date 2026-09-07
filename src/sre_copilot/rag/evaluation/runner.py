@@ -27,6 +27,14 @@ from typing import Any
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+
+from sre_copilot.rag.evaluation.ragas_compat import patch_ragas_vertexai_imports
+
+# Ragas 0.4.3 imports Vertex AI classes from legacy langchain-community paths.
+# Installations that import this runner directly must receive the compatibility
+# patch before importing anything from Ragas.
+patch_ragas_vertexai_imports()
+
 from ragas import EvaluationDataset
 from ragas.llms import llm_factory
 from ragas.metrics.collections import (
