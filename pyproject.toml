@@ -16,6 +16,7 @@ dependencies = [
     "httpx",
     "mcp>=2",
     "google-genai",
+    "claude-agent-sdk>=0.2.152",
     "langgraph>=1.2.11",
     "langchain-google-genai",
     "langchain-google-vertexai",
