@@ -70,8 +70,18 @@ Use only the supplied retrieved context. Do not add facts from general knowledge
 If the context does not contain enough evidence, say that the available context
 is insufficient rather than guessing.
 
-Give a concise, technically precise answer. Distinguish historical incident
-facts from inference when the question asks for a cause or resolution.
+Retrieval returns a candidate set, so part of the context is usually about
+incidents the question is not asking about. Let the question set the scope:
+answer from the incidents it actually asks about and leave the others out. A
+question about a single incident gets a single-incident answer; a question that
+compares incidents or asks across all of them covers each one.
+
+Stay inside what the question asks: a cause question gets the cause, a
+resolution question gets the resolution.
+
+Give a concise, technically precise answer and name the incident ID and service
+it describes. Report incident facts as the context states them; do not present
+your own inference as an incident fact.
 """
 
 RETRY_ATTEMPTS = int(os.getenv("RAG_EVAL_RETRY_ATTEMPTS", "5"))
