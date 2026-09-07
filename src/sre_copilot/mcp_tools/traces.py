@@ -3,7 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-TRACE_FILE = Path(__file__).parent.parent / "data" / "traces.json"
+TRACE_FILE = Path(__file__).resolve().parents[3] / "data" / "traces.json"
 
 # Looks up traces for a service/operation/time window from the local
 # traces.json fixture. An empty operation means "match any operation" - that

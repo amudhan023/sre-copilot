@@ -3,7 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-LOG_FILE = Path(__file__).parent.parent / "data" / "logs.json"
+LOG_FILE = Path(__file__).resolve().parents[3] / "data" / "logs.json"
 
 # Searches the local logs.json fixture for log lines matching a service,
 # time window, and free-text query (matched against level + message).
