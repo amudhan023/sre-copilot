@@ -10,14 +10,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-# This module is the only place that actually calls an LLM. It tries Gemini
-# first, and falls back to Groq if Gemini is unavailable or fails with a
-# transient error. Since Gemini and Groq use different message/tool-call
-# shapes (Gemini's native format vs Groq's OpenAI-compatible one), a good
-# chunk of this file is just translating between the two so the rest of the
-# agent doesn't have to care which provider actually answered. There's also
-# a safety mechanism here that caps how much tool-result text gets sent back
-# to Groq, since oversized payloads can blow past its context/request limits.
+from sre_copilot.agent.claude_code_llm import invoke as invoke_claude_code
 
 load_dotenv()
 
@@ -127,6 +120,7 @@ Recommended next steps:
   claimed but that tools did not return.
 """
 
+
 class ProviderConfigurationError(RuntimeError):
     """A provider is configured incorrectly and must not be skipped."""
 
@@ -147,7 +141,7 @@ def _provider_names() -> list[str]:
     ]
     if not providers:
         raise ProviderConfigurationError("LLM_PROVIDERS must name at least one provider")
-    unknown = set(providers) - {"gemini", "groq"}
+    unknown = set(providers) - {"gemini", "groq", "claude_code"}
     if unknown:
         raise ProviderConfigurationError(
             f"Unsupported LLM provider(s): {', '.join(sorted(unknown))}"
@@ -232,7 +226,6 @@ def _truncate_tool_result(content: str, limit: int) -> str:
 
 
 def _cap_groq_tool_history(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Limit old tool output without reducing the original incident description."""
     remaining = GROQ_MAX_HISTORY_TOOL_CHARS
     for message in reversed(messages):
         content = message["content"]
@@ -268,7 +261,6 @@ def _groq_messages(contents: list[Any]) -> list[dict[str, Any]]:
             parts = content.get("parts")
         if role not in {"user", "model"} or not isinstance(parts, list):
             raise ProviderConfigurationError("Malformed Gemini conversation contents")
-
         text_parts = []
         tool_calls = []
         for part in parts:
@@ -291,14 +283,12 @@ def _groq_messages(contents: list[Any]) -> list[dict[str, Any]]:
                 pending_calls.append((call_id, name))
             elif text:
                 text_parts.append(text)
-
         if role == "model":
             message: dict[str, Any] = {"role": "assistant", "content": "\n".join(text_parts) or None}
             if tool_calls:
                 message["tool_calls"] = tool_calls
             messages.append(message)
             continue
-
         for text in text_parts:
             result = _tool_result(text)
             if result:
@@ -317,7 +307,6 @@ def _groq_response(payload: dict[str, Any]):
         message = payload["choices"][0]["message"]
     except (KeyError, IndexError, TypeError) as error:
         raise ValueError("Groq returned a malformed response") from error
-
     parts = []
     if message.get("content"):
         parts.append(types.Part(text=message["content"]))
@@ -330,7 +319,6 @@ def _groq_response(payload: dict[str, Any]):
             )))
         except (KeyError, TypeError, json.JSONDecodeError) as error:
             raise ValueError("Groq returned a malformed tool call") from error
-
     return types.GenerateContentResponse(
         candidates=[types.Candidate(content=types.Content(role="model", parts=parts))]
     )
@@ -382,7 +370,9 @@ def _call_provider(provider: str, contents: list[Any], tool: Any):
     logger.info("LLM provider: %s", provider)
     if provider == "gemini":
         return _call_gemini(contents, tool)
-    return _call_groq(contents, tool)
+    if provider == "groq":
+        return _call_groq(contents, tool)
+    return invoke_claude_code(contents)
 
 
 def continue_gemini(contents, tool):
