@@ -6,6 +6,10 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from .ragas_compat import patch_ragas_vertexai_imports
+
+patch_ragas_vertexai_imports()
+
 from ragas import EvaluationDataset, SingleTurnSample
 
 
