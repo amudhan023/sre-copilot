@@ -2,7 +2,7 @@
 RAG retrieval integration test and inspection script.
 
 Purpose:
-    Exercise the PostgreSQL-backed hybrid retrieval pipeline against the
+    Exercise the complete PostgreSQL-backed retrieval pipeline against the
     incidents currently loaded by mcp_tools.rag.ingest.
 
 Behavior:
@@ -10,12 +10,13 @@ Behavior:
     - Runs dense BGE-M3 retrieval through pgvector.
     - Runs PostgreSQL full-text sparse retrieval.
     - Combines both ranked lists with Reciprocal Rank Fusion (RRF).
-    - Prints enough metadata and scores to verify each retrieval stage.
+    - Reranks the RRF candidates with BGE Reranker v2-M3.
+    - Prints the final Top-K results and their reranker scores.
 
 Important details:
-    - This script intentionally does not run the cross-encoder yet. The
-      existing BGE reranker is wired in the next implementation step.
-    - Keep the test query aligned with the sample incidents so the retrieval
+    - The cross-encoder only reranks the RRF candidate set; it does not
+      perform database retrieval.
+    - Keep the test query aligned with the sample incidents so the ranking
       behavior is easy to inspect.
     - Run this module with `uv run python -m mcp_tools.rag.test_retrieval`.
 """
@@ -43,6 +44,8 @@ def print_results(title, results):
             print(f"   sparse_score={result['sparse_score']:.6f}")
         if "rrf_score" in result:
             print(f"   rrf_score={result['rrf_score']:.6f}")
+        if "rerank_score" in result:
+            print(f"   rerank_score={result['rerank_score']:.6f}")
         if "dense_rank" in result:
             print(f"   dense_rank={result['dense_rank']}")
         if "sparse_rank" in result:
@@ -54,34 +57,40 @@ def main():
     print(f"Tenant: {DEFAULT_TENANT}")
 
     retriever = HybridRetriever()
-
-    dense = retriever.dense_search(
+    retrieval = retriever.retrieve(
         TEST_QUERY,
         tenant=DEFAULT_TENANT,
-        limit=20,
+        dense_limit=20,
+        sparse_limit=20,
+        rrf_limit=20,
+        top_k=5,
     )
 
-    sparse = retriever.sparse_search(
-        TEST_QUERY,
-        tenant=DEFAULT_TENANT,
-        limit=20,
-    )
+    print_results("Dense Retrieval", retrieval["dense"])
+    print_results("Sparse Retrieval", retrieval["sparse"])
+    print_results("RRF Retrieval", retrieval["rrf"])
+    print_results("Final Reranked Top-K", retrieval["results"])
 
-    rrf = retriever.hybrid_search(
-        TEST_QUERY,
-        tenant=DEFAULT_TENANT,
-        limit=20,
-        candidate_limit=20,
-    )
-
-    print_results("Dense Retrieval", dense)
-    print_results("Sparse Retrieval", sparse)
-    print_results("RRF Retrieval", rrf)
-
-    if not rrf:
+    if not retrieval["rrf"]:
         raise AssertionError("RRF returned no results")
 
-    print("\nRetrieval test passed: dense, sparse, and RRF returned results.")
+    if not retrieval["results"]:
+        raise AssertionError("Reranker returned no results")
+
+    if len(retrieval["results"]) > 5:
+        raise AssertionError("Final results exceeded top_k=5")
+
+    if any("rerank_score" not in result for result in retrieval["results"]):
+        raise AssertionError("Final result is missing rerank_score")
+
+    scores = [result["rerank_score"] for result in retrieval["results"]]
+    if scores != sorted(scores, reverse=True):
+        raise AssertionError("Final results are not sorted by rerank_score")
+
+    print(
+        "\nRetrieval test passed: dense, sparse, RRF, "
+        "and cross-encoder reranking returned valid results."
+    )
 
 
 if __name__ == "__main__":
