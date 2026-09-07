@@ -73,7 +73,7 @@ def _messages_to_prompt(contents: list[Any]) -> str:
                     f"[Assistant tool call: {name}({json.dumps(args, sort_keys=True)})]"
                 )
         if text_parts:
-            lines.append(f"{role_name}:\n{'\n'.join(text_parts)}")
+            lines.append(f"{role_name}:\n" + "\n".join(text_parts))
 
     if not lines:
         raise ClaudeCodeRequestError("Claude Code request contains no message content")
@@ -93,16 +93,8 @@ def _options() -> Any:
         permission_mode=os.getenv("CLAUDE_CODE_PERMISSION_MODE", "default"),
         allowed_tools=[],
         disallowed_tools=[
-            "Bash",
-            "Read",
-            "Write",
-            "Edit",
-            "NotebookEdit",
-            "Glob",
-            "Grep",
-            "WebFetch",
-            "WebSearch",
-            "Task",
+            "Bash", "Read", "Write", "Edit", "NotebookEdit",
+            "Glob", "Grep", "WebFetch", "WebSearch", "Task",
         ],
         cwd=os.getenv("CLAUDE_CODE_WORKING_DIRECTORY") or None,
     )
@@ -152,6 +144,7 @@ def _response(text: str) -> types.GenerateContentResponse:
 async def invoke(
     contents: list[Any],
     *,
+    system_prompt: str | None = None,
     timeout_seconds: int | None = None,
     client: Callable[..., AsyncIterator[Any]] | None = None,
 ) -> types.GenerateContentResponse:
@@ -161,7 +154,8 @@ async def invoke(
             "claude-agent-sdk is not installed; install the project dependency before using LLM_PROVIDER=claude_code"
         )
 
-    prompt = _messages_to_prompt(contents)
+    logical_prompt = _messages_to_prompt(contents)
+    prompt = logical_prompt if not system_prompt else f"System instructions:\n{system_prompt}\n\n{logical_prompt}"
     options = _options()
     timeout = timeout_seconds or _int_env("CLAUDE_CODE_TIMEOUT_SECONDS", 180)
     query_client = client or query
