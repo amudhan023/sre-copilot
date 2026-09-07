@@ -2,21 +2,34 @@
 Hybrid retrieval for the SRE Copilot knowledge base.
 
 This module combines PostgreSQL/pgvector dense retrieval with PostgreSQL
-full-text sparse retrieval and merges their ranked results using Reciprocal
-Rank Fusion (RRF).
+full-text sparse retrieval, merges their rankings with Reciprocal Rank Fusion
+(RRF), and optionally reranks the RRF candidates with a BGE cross-encoder.
+
+Pipeline:
+    Query
+      -> BGE-M3 dense embedding
+      -> pgvector dense search + PostgreSQL FTS sparse search
+      -> RRF candidate set
+      -> BGE Reranker v2-M3
+      -> final Top-K
 
 Important implementation details:
 - Dense retrieval uses BGE-M3 embeddings and pgvector cosine distance.
 - Sparse retrieval uses the indexed PostgreSQL TSVECTOR column.
 - Every database retrieval path requires a tenant filter.
 - RRF combines rankings, not raw dense/sparse scores.
-- Cross-encoder reranking is kept separate in reranker.py and will consume
-  the RRF candidate set in the next step.
+- The cross-encoder only sees the RRF candidate set; it never searches the
+  database directly.
+- ``hybrid_search`` remains RRF-only for callers that need the intermediate
+  candidate set.
+- ``retrieve`` is the complete retrieval pipeline and returns the final
+  reranked results.
 """
 
 from collections.abc import Iterable
 
 from mcp_tools.rag.embeddings import BGE3Embeddings
+from mcp_tools.rag.reranker import BGEReranker
 from mcp_tools.rag.store import dense_search, sparse_search
 
 
@@ -55,10 +68,15 @@ def reciprocal_rank_fusion(
 
 
 class HybridRetriever:
-    """Run dense + sparse retrieval and return RRF-ranked candidates."""
+    """Run dense + sparse retrieval, RRF, and cross-encoder reranking."""
 
-    def __init__(self, embedder: BGE3Embeddings | None = None):
+    def __init__(
+        self,
+        embedder: BGE3Embeddings | None = None,
+        reranker: BGEReranker | None = None,
+    ):
         self.embedder = embedder or BGE3Embeddings()
+        self.reranker = reranker or BGEReranker()
 
     def dense_search(
         self,
@@ -122,8 +140,14 @@ class HybridRetriever:
         dense_limit: int = 20,
         sparse_limit: int = 20,
         rrf_limit: int = 20,
+        top_k: int = 5,
     ) -> dict:
-        """Return both raw ranked lists and the fused RRF candidate list."""
+        """Run the complete retrieval pipeline and return final Top-K results."""
+        if top_k <= 0:
+            raise ValueError("top_k must be greater than zero")
+        if rrf_limit <= 0:
+            raise ValueError("rrf_limit must be greater than zero")
+
         dense = self.dense_search(
             query,
             tenant=tenant,
@@ -135,6 +159,11 @@ class HybridRetriever:
             limit=sparse_limit,
         )
         rrf = reciprocal_rank_fusion([dense, sparse])[:rrf_limit]
+        reranked = self.reranker.rerank(
+            query,
+            rrf,
+            top_k=top_k,
+        )
 
         return {
             "query": query,
@@ -142,4 +171,5 @@ class HybridRetriever:
             "dense": dense,
             "sparse": sparse,
             "rrf": rrf,
+            "results": reranked,
         }
