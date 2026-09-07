@@ -1,10 +1,10 @@
 from datetime import datetime
 from mcp.server.mcpserver import MCPServer
-from mcp_tools.metrics import query_metrics, list_available_metrics
-from mcp_tools.logs import search_logs
-from mcp_tools.traces import get_traces
-from mcp_tools.deployments import recent_deploys
-from mcp_tools.incidents import find_similar_incidents
+from sre_copilot.mcp_tools.metrics import query_metrics, list_available_metrics
+from sre_copilot.mcp_tools.logs import search_logs
+from sre_copilot.mcp_tools.traces import get_traces
+from sre_copilot.mcp_tools.deployments import recent_deploys
+from sre_copilot.mcp_tools.incidents import find_similar_incidents
 
 
 mcp = MCPServer("sre-tools")
@@ -26,6 +26,7 @@ def search_similar_incidents(
         query=query,
     )
 
+
 @mcp.tool()
 def search_recent_deploys(
     service: str,
@@ -38,6 +39,7 @@ def search_recent_deploys(
         start_time=start_time,
         end_time=end_time,
     )
+
 
 @mcp.tool()
 def search_service_logs(
@@ -55,10 +57,12 @@ def search_service_logs(
         end_time=end_time,
     )
 
+
 @mcp.tool()
 def list_metrics(service: str) -> list[str]:
     """List metric names available for a service in Prometheus."""
     return list_available_metrics(service)
+
 
 @mcp.tool()
 def get_metrics(

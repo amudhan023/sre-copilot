@@ -1,9 +1,7 @@
-from mcp_tools.rag.retriever import HybridRetriever
+from sre_copilot.rag.retriever import HybridRetriever
 
-# Manual smoke test (not pytest) for the hybrid retriever. Runs one real
-# query against Postgres and prints each result's dense/sparse ranks and
-# RRF score, so you can eyeball whether the fusion logic is picking sensible
-# chunks. Run with `python -m mcp_tools.rag.test_retriever`.
+# Manual smoke test for the hybrid retriever. Runs one real query against
+# Postgres and prints each result's dense/sparse ranks and RRF score.
 
 
 def main():
@@ -11,7 +9,7 @@ def main():
 
     results = retriever.hybrid_search(
         query="database connection pool exhaustion",
-        service="payment-api",
+        tenant="default",
         limit=5,
     )
 

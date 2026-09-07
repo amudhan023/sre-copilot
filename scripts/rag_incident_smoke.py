@@ -1,4 +1,4 @@
-from mcp_tools.incidents import find_similar_incidents
+from sre_copilot.mcp_tools.incidents import find_similar_incidents
 
 
 def main():
@@ -13,10 +13,7 @@ def main():
     print("Service:", result["service"])
     print("Query:", result["query"])
 
-    for index, incident in enumerate(
-        result["incidents"],
-        start=1,
-    ):
+    for index, incident in enumerate(result["incidents"], start=1):
         print(f"\n--- Incident {index} ---")
         print("ID:", incident["incident_id"])
         print("Score:", incident["score"])

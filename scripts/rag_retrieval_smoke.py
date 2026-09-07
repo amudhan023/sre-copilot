@@ -1,27 +1,6 @@
-"""
-RAG retrieval integration test and inspection script.
+"""RAG retrieval integration test and inspection script."""
 
-Purpose:
-    Exercise the complete PostgreSQL-backed retrieval pipeline against the
-    incidents currently loaded by mcp_tools.rag.ingest.
-
-Behavior:
-    - Uses the default tenant used by the ingestion script.
-    - Runs dense BGE-M3 retrieval through pgvector.
-    - Runs PostgreSQL full-text sparse retrieval.
-    - Combines both ranked lists with Reciprocal Rank Fusion (RRF).
-    - Reranks the RRF candidates with BGE Reranker v2-M3.
-    - Prints the final Top-K results and their reranker scores.
-
-Important details:
-    - The cross-encoder only reranks the RRF candidate set; it does not
-      perform database retrieval.
-    - Keep the test query aligned with the sample incidents so the ranking
-      behavior is easy to inspect.
-    - Run this module with `uv run python -m mcp_tools.rag.test_retrieval`.
-"""
-
-from mcp_tools.rag.retriever import HybridRetriever
+from sre_copilot.rag.retriever import HybridRetriever
 
 
 DEFAULT_TENANT = "default"
@@ -73,13 +52,10 @@ def main():
 
     if not retrieval["rrf"]:
         raise AssertionError("RRF returned no results")
-
     if not retrieval["results"]:
         raise AssertionError("Reranker returned no results")
-
     if len(retrieval["results"]) > 5:
         raise AssertionError("Final results exceeded top_k=5")
-
     if any("rerank_score" not in result for result in retrieval["results"]):
         raise AssertionError("Final result is missing rerank_score")
 

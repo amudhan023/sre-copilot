@@ -26,8 +26,8 @@ The underlying RAG pipeline uses:
     BGE-M3 -> pgvector + PostgreSQL FTS -> RRF -> BGE reranker
 """
 
-from mcp_tools.rag.retriever import HybridRetriever
-from mcp_tools.rag.reranker import BGEReranker
+from sre_copilot.rag.retriever import HybridRetriever
+from sre_copilot.rag.reranker import BGEReranker
 
 
 retriever = HybridRetriever()

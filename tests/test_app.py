@@ -1,6 +1,6 @@
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-from receiver.app import app
+from sre_copilot.receiver.app import app
 
 # Tests the alert receiver end to end through FastAPI's TestClient: health
 # check, request validation, successful publish to Kafka, Kafka being down,
@@ -21,7 +21,7 @@ def test_missing_labels_rejected():
 
 
 def test_alert_published():
-    with patch("receiver.app.get_producer") as gp, patch("receiver.app.get_redis"):
+    with patch("sre_copilot.receiver.app.get_producer") as gp, patch("sre_copilot.receiver.app.get_redis"):
         r = client.post("/alerts", json={
             "groupLabels": {"tenant": "acme", "service": "api"},
             "commonLabels": {"alertname": "HighLatency"},
@@ -35,10 +35,11 @@ def test_alert_published():
 
 def test_kafka_down_returns_503():
     from kafka.errors import KafkaError
-    with patch("receiver.app.get_producer", side_effect=KafkaError("boom")), \
-         patch("receiver.app.get_redis"):
+    with patch("sre_copilot.receiver.app.get_producer", side_effect=KafkaError("boom")), \
+         patch("sre_copilot.receiver.app.get_redis"):
         r = client.post("/alerts", json={"groupLabels": {"tenant": "a", "service": "b"}})
         assert r.status_code == 503
+
 
 def test_duplicate_alert_only_published_once():
     class FakeRedis:
@@ -46,7 +47,6 @@ def test_duplicate_alert_only_published_once():
 
         def set(self, key, value, nx=False, ex=None):
             FakeRedis.calls += 1
-            # first alert is new, the identical second one is a duplicate
             return FakeRedis.calls == 1
 
     payload = {
@@ -55,8 +55,8 @@ def test_duplicate_alert_only_published_once():
         "status": "firing",
     }
 
-    with patch("receiver.app.get_producer") as gp, \
-         patch("receiver.app.get_redis", return_value=FakeRedis()):
+    with patch("sre_copilot.receiver.app.get_producer") as gp, \
+         patch("sre_copilot.receiver.app.get_redis", return_value=FakeRedis()):
         first = client.post("/alerts", json=payload)
         second = client.post("/alerts", json=payload)
 
@@ -64,7 +64,6 @@ def test_duplicate_alert_only_published_once():
         assert second.status_code == 200, second.text
         assert first.json() == {"received": True}
         assert second.json()["duplicate"] is True
-        # kafka sees the alert only once
         assert gp.return_value.send.call_count == 1
 
 

@@ -2,8 +2,8 @@ from functools import partial
 
 from langgraph.graph import StateGraph, END
 
-from agent.state import AgentState
-from agent.nodes import llm_node, tool_node
+from sre_copilot.agent.state import AgentState
+from sre_copilot.agent.nodes import llm_node, tool_node
 
 # This wires up the LangGraph state machine that drives the investigation.
 # It's a simple two-node loop: "llm" decides what to do next (answer, or call
@@ -21,6 +21,7 @@ def route_after_llm(state: AgentState):
             return "tool"
 
     return END
+
 
 def build_graph(session, gemini_tool):
     graph = StateGraph(AgentState)

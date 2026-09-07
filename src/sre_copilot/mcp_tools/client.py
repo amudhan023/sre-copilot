@@ -7,13 +7,13 @@ from mcp.client.stdio import stdio_client
 # A manual smoke test: starts the MCP server as a subprocess, lists its
 # tools, and calls get_metrics once to check the wiring works end to end.
 # Not part of the automated test suite - run it directly with
-# `python -m mcp_tools.client`.
+# `python -m sre_copilot.mcp_tools.client`.
 
 
 async def main():
     server_params = StdioServerParameters(
         command=sys.executable,
-        args=["-m", "mcp_tools.server"],
+        args=["-m", "sre_copilot.mcp_tools.server"],
     )
 
     async with stdio_client(server_params) as (read, write):

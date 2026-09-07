@@ -1,7 +1,7 @@
 import asyncio
 
-from agent.llm import continue_gemini
-from agent.state import AgentState
+from sre_copilot.agent.llm import continue_gemini
+from sre_copilot.agent.state import AgentState
 
 # The two LangGraph nodes that make up the investigation loop. llm_node asks
 # the LLM what to do next and hands back its response as-is. tool_node looks
@@ -21,6 +21,7 @@ def llm_node(state: AgentState, gemini_tool) -> AgentState:
             response.candidates[0].content
         ]
     }
+
 
 async def tool_node(state: AgentState, session) -> AgentState:
     last_message = state["messages"][-1]

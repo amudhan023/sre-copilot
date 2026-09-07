@@ -28,9 +28,9 @@ Important implementation details:
 
 from collections.abc import Iterable
 
-from mcp_tools.rag.embeddings import BGE3Embeddings
-from mcp_tools.rag.reranker import BGEReranker
-from mcp_tools.rag.store import dense_search, sparse_search
+from sre_copilot.rag.embeddings import BGE3Embeddings
+from sre_copilot.rag.reranker import BGEReranker
+from sre_copilot.rag.store import dense_search, sparse_search
 
 
 DEFAULT_RRF_K = 60

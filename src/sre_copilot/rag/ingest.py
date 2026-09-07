@@ -1,25 +1,26 @@
 import json
 from pathlib import Path
 
-from mcp_tools.rag.chunker import chunk_text
-from mcp_tools.rag.embeddings import BGE3Embeddings
-from mcp_tools.rag.store import get_connection, create_table
+from sre_copilot.rag.chunker import chunk_text
+from sre_copilot.rag.embeddings import BGE3Embeddings
+from sre_copilot.rag.store import get_connection, create_table
 
 # One-off script that loads data/incidents.json, turns each incident into a
 # readable text document, splits those documents into overlapping chunks,
 # embeds all the chunks with BGE-M3, and upserts everything into the
-# rag_chunks table in Postgres. Run it with `python -m mcp_tools.rag.ingest`
+# rag_chunks table in Postgres. Run it with `python -m sre_copilot.rag.ingest`
 # whenever the incidents dataset changes, so the RAG retriever has fresh
 # data to search over.
 
 
 INCIDENT_FILE = (
-    Path(__file__).parent.parent.parent
+    Path(__file__).parent.parent.parent.parent
     / "data"
     / "incidents.json"
 )
 
 DEFAULT_TENANT = "default"
+
 
 def load_incidents():
     with INCIDENT_FILE.open(encoding="utf-8") as file:
@@ -65,16 +66,11 @@ def main():
             chunk_overlap=15,
         )
 
-        for chunk_index, content in enumerate(
-            document_chunks
-        ):
+        for chunk_index, content in enumerate(document_chunks):
             chunks.append(
                 {
                     "document_id": document["document_id"],
-                    "chunk_id": (
-                        f"{document['document_id']}"
-                        f"-chunk-{chunk_index}"
-                    ),
+                    "chunk_id": f"{document['document_id']}-chunk-{chunk_index}",
                     "chunk_index": chunk_index,
                     "service": document["service"],
                     "document_type": "incident",
@@ -87,11 +83,7 @@ def main():
     print(f"Created {len(chunks)} chunks")
 
     embedder = BGE3Embeddings()
-
-    embeddings = embedder.encode(
-        [chunk["content"] for chunk in chunks]
-    )
-
+    embeddings = embedder.encode([chunk["content"] for chunk in chunks])
     dense_vectors = embeddings["dense"]
 
     with get_connection() as connection:
@@ -127,7 +119,7 @@ def main():
                     search_vector = EXCLUDED.search_vector
                 """,
                 (
-                    DEFAULT_TENANT, 
+                    DEFAULT_TENANT,
                     chunk["document_id"],
                     chunk["chunk_id"],
                     chunk["chunk_index"],
@@ -142,10 +134,8 @@ def main():
 
         connection.commit()
 
-    print(
-        f"Inserted {len(chunks)} chunks into PostgreSQL"
-    )
+    print(f"Inserted {len(chunks)} chunks into PostgreSQL")
 
 
 if __name__ == "__main__":
-    main() 
+    main()

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from mcp_tools import metrics
+from sre_copilot.mcp_tools import metrics
 
 # Tests query_metrics against a fake Prometheus response (via monkeypatched
 # httpx.get) so the test doesn't need a real Prometheus instance running.
