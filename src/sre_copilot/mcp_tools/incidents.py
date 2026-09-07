@@ -38,8 +38,17 @@ from sre_copilot.rag.retriever import HybridRetriever
 DENSE_LIMIT = 20
 SPARSE_LIMIT = 20
 RRF_LIMIT = 20
-TOP_K = 5
 MAX_INCIDENTS = 5
+
+# Rerank the whole RRF candidate set instead of just the first MAX_INCIDENTS
+# chunks. Several chunks can belong to the same historical incident, so
+# deduplication needs more chunks than the number of incidents it must
+# return - otherwise five chunks from two incidents can only ever yield two
+# results. This costs no extra model work: the cross-encoder scores every
+# candidate it is handed and only then truncates to top_k (see
+# rag/reranker.py), so a larger top_k just keeps rows that were already
+# scored. The MCP response is still capped at MAX_INCIDENTS.
+TOP_K = RRF_LIMIT
 
 # The retriever owns the BGE-M3 embedder and the BGE cross-encoder, so it is
 # built once and reused. It is created lazily rather than at import time so

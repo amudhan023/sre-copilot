@@ -68,9 +68,15 @@ def test_retrieve_is_called_with_tenant_and_pipeline_limits(fake_retriever):
             "dense_limit": 20,
             "sparse_limit": 20,
             "rrf_limit": 20,
-            "top_k": 5,
+            # top_k covers the whole RRF candidate set so deduplication has
+            # enough chunks to still find five distinct incidents.
+            "top_k": 20,
         }
     ]
+
+
+def test_top_k_leaves_room_for_deduplication():
+    assert incidents.TOP_K >= incidents.MAX_INCIDENTS
 
 
 def test_chunks_collapse_into_one_entry_per_incident(fake_retriever):
@@ -98,6 +104,29 @@ def test_chunks_collapse_into_one_entry_per_incident(fake_retriever):
     assert result["tenant"] == "default"
     assert result["service"] == "payment-api"
     assert result["query"] == "database timeouts"
+
+
+def test_five_incidents_are_returned_when_earlier_chunks_repeat(fake_retriever):
+    # The top chunks all belong to one incident, so a retriever that only
+    # returned MAX_INCIDENTS chunks could never reach five distinct results.
+    fake_retriever(
+        [chunk("INC-1042", index, 0.99 - index / 100) for index in range(5)]
+        + [chunk(f"INC-{index}", 0, 0.5 - index / 100) for index in range(4)]
+    )
+
+    result = incidents.find_similar_incidents(
+        tenant="default",
+        service="payment-api",
+        query="database timeouts",
+    )
+
+    assert [incident["incident_id"] for incident in result["incidents"]] == [
+        "INC-1042",
+        "INC-0",
+        "INC-1",
+        "INC-2",
+        "INC-3",
+    ]
 
 
 def test_at_most_five_incidents_are_returned(fake_retriever):
