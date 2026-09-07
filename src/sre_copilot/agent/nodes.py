@@ -8,6 +8,32 @@ from sre_copilot.agent.state import AgentState
 # at the LLM's last message, runs every tool call it contains in parallel
 # (via asyncio.gather), and turns each result into a plain text message the
 # LLM can read on its next turn.
+#
+# tool_node also owns tenant scoping. The tenant is a security boundary for
+# the RAG knowledge base, so it comes from the incident in AgentState rather
+# than from whatever the LLM decided to put in the tool arguments.
+
+
+# MCP tools whose retrieval must stay inside the incident's tenant.
+TENANT_SCOPED_TOOLS = {"search_similar_incidents"}
+
+
+def tool_arguments(call, state: AgentState) -> dict:
+    """Build the MCP arguments for one tool call, stamping in the tenant."""
+    arguments = dict(call.args)
+
+    if call.name in TENANT_SCOPED_TOOLS:
+        tenant = state.get("tenant")
+
+        if not tenant:
+            raise ValueError(
+                f"{call.name} requires a tenant, but the incident state has none"
+            )
+
+        # Overwrite rather than default: the LLM must never pick the tenant.
+        arguments["tenant"] = tenant
+
+    return arguments
 
 
 def llm_node(state: AgentState, gemini_tool) -> AgentState:
@@ -39,7 +65,7 @@ async def tool_node(state: AgentState, session) -> AgentState:
         *[
             session.call_tool(
                 call.name,
-                dict(call.args),
+                tool_arguments(call, state),
             )
             for call in tool_calls
         ]

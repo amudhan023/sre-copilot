@@ -1,8 +1,13 @@
 from sre_copilot.mcp_tools.incidents import find_similar_incidents
 
+# Local development/testing tenant. Ingestion writes the sample incidents
+# under this tenant (see sre_copilot/rag/ingest.py).
+DEFAULT_TENANT = "default"
+
 
 def main():
     result = find_similar_incidents(
+        tenant=DEFAULT_TENANT,
         service="payment-api",
         query=(
             "payment failures caused by "
@@ -10,6 +15,7 @@ def main():
         ),
     )
 
+    print("Tenant:", result["tenant"])
     print("Service:", result["service"])
     print("Query:", result["query"])
 

@@ -17,11 +17,19 @@ mcp = MCPServer("sre-tools")
 
 @mcp.tool()
 def search_similar_incidents(
+    tenant: str,
     service: str,
     query: str,
 ) -> dict:
-    """Find incidents similar to the current incident."""
+    """Search past incidents for ones similar to the current incident.
+
+    Returns historical incidents from the tenant's knowledge base. They are
+    supporting evidence for a hypothesis, never proof of what happened in
+    the current incident. ``tenant`` scopes the search to the incident's
+    tenant and must be the tenant of the incident under investigation.
+    """
     return find_similar_incidents(
+        tenant=tenant,
         service=service,
         query=query,
     )

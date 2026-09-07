@@ -7,7 +7,7 @@ Purpose:
 
 High-level flow:
     Current incident context
-        -> Hybrid retrieval
+        -> Hybrid retrieval (dense + sparse)
         -> RRF candidate ranking
         -> Cross-encoder reranking
         -> Document-level deduplication
@@ -22,40 +22,70 @@ Important:
       - patterns observed in historical incidents
       - hypotheses inferred from those patterns
 
+Tenant isolation:
+    Every retrieval is scoped to the incident's tenant. The tenant is
+    supplied by the caller (the agent state, via the MCP tool) and is
+    passed straight through to ``HybridRetriever.retrieve``. There is no
+    default and no unscoped search path.
+
 The underlying RAG pipeline uses:
     BGE-M3 -> pgvector + PostgreSQL FTS -> RRF -> BGE reranker
 """
 
 from sre_copilot.rag.retriever import HybridRetriever
-from sre_copilot.rag.reranker import BGEReranker
 
 
-retriever = HybridRetriever()
-reranker = BGEReranker()
+DENSE_LIMIT = 20
+SPARSE_LIMIT = 20
+RRF_LIMIT = 20
+TOP_K = 5
+MAX_INCIDENTS = 5
+
+# The retriever owns the BGE-M3 embedder and the BGE cross-encoder, so it is
+# built once and reused. It is created lazily rather than at import time so
+# that importing this module (for the MCP server, or for a unit test) does
+# not load the models until an incident search actually needs them.
+_retriever: HybridRetriever | None = None
+
+
+def get_retriever() -> HybridRetriever:
+    """Return the shared retriever, building it on first use."""
+    global _retriever
+
+    if _retriever is None:
+        _retriever = HybridRetriever()
+
+    return _retriever
 
 
 def find_similar_incidents(
+    tenant: str,
     service: str,
     query: str,
 ) -> dict:
-    candidates = retriever.hybrid_search(
+    """Return historical incidents similar to the current incident.
+
+    ``tenant`` scopes the retrieval; the search never crosses tenants.
+    """
+    if not tenant or not tenant.strip():
+        raise ValueError("tenant is required for historical incident search")
+
+    retrieval = get_retriever().retrieve(
         query=query,
-        service=service,
-        candidate_limit=20,
-        limit=20,
+        tenant=tenant,
+        dense_limit=DENSE_LIMIT,
+        sparse_limit=SPARSE_LIMIT,
+        rrf_limit=RRF_LIMIT,
+        top_k=TOP_K,
     )
 
-    reranked = reranker.rerank(
-        query=query,
-        results=candidates,
-        top_k=10,
-    )
-
-    # Keep only the best chunk from each historical incident.
+    # Results arrive sorted by rerank_score, so the first chunk seen for a
+    # historical incident is its best-ranked chunk. Later chunks from the
+    # same incident would only repeat it, so they are dropped.
     incidents = []
     seen_documents = set()
 
-    for result in reranked:
+    for result in retrieval["results"]:
         document_id = result["document_id"]
 
         if document_id in seen_documents:
@@ -72,8 +102,12 @@ def find_similar_incidents(
             }
         )
 
+        if len(incidents) == MAX_INCIDENTS:
+            break
+
     return {
+        "tenant": tenant,
         "service": service,
         "query": query,
-        "incidents": incidents[:5],
+        "incidents": incidents,
     }

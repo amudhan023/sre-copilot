@@ -10,6 +10,15 @@ from sre_copilot.agent.tools import mcp_tools_to_gemini
 # Manual end-to-end script (not a pytest test). It spins up the real MCP
 # server as a subprocess, builds the Gemini tool definitions from it, builds
 # the LangGraph graph, and runs one hardcoded incident through the whole thing.
+#
+# The incident carries a tenant, exactly like an alert coming from the
+# receiver would. tool_node stamps that tenant into every tenant-scoped MCP
+# call, so the historical incident search stays inside the tenant.
+
+
+# Local development/testing tenant. Ingestion writes the sample incidents
+# under this tenant (see sre_copilot/rag/ingest.py).
+DEFAULT_TENANT = "default"
 
 
 async def main():
@@ -31,6 +40,12 @@ async def main():
             )
 
             initial_state = {
+                "incident_id": "INC-2101",
+                "tenant": DEFAULT_TENANT,
+                "service": "payment-api",
+                "alert_name": "HighCPUUsage",
+                "start_time": "2026-09-04T10:00:00+00:00",
+                "end_time": "2026-09-04T10:10:00+00:00",
                 "messages": [
                     {
                         "role": "user",
