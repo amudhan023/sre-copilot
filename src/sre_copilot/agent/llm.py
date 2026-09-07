@@ -11,6 +11,23 @@ from google import genai
 from google.genai import types
 
 from sre_copilot.agent.claude_code_llm import invoke as invoke_claude_code
+from sre_copilot.llm_files import exchange, extract_json, transport_is_enabled
+
+# This module is the only place that actually calls an LLM. It tries Gemini
+# first, and falls back to Groq if Gemini is unavailable or fails with a
+# transient error. Since Gemini and Groq use different message/tool-call
+# shapes (Gemini's native format vs Groq's OpenAI-compatible one), a good
+# chunk of this file is just translating between the two so the rest of the
+# agent doesn't have to care which provider actually answered. There's also
+# a safety mechanism here that caps how much tool-result text gets sent back
+# to Groq, since oversized payloads can blow past its context/request limits.
+#
+# Two more providers sit behind the same boundary. "claude_code" answers
+# through the Claude Agent SDK (see claude_code_llm.py). "file" answers from
+# disk instead of over the network: it writes the prompt to llm_calls/request/
+# and waits for a reply in llm_calls/response/. Name either one in
+# LLM_PROVIDERS, or set LLM_TRANSPORT=file to route every call through the
+# file provider.
 
 load_dotenv()
 
@@ -134,6 +151,12 @@ class ProviderRequestError(RuntimeError):
 
 
 def _provider_names() -> list[str]:
+    # LLM_TRANSPORT=file answers every call from disk, whatever the configured
+    # API providers are. It is the switch to reach for when the hosted models
+    # are down and a run still has to finish.
+    if transport_is_enabled():
+        return ["file"]
+
     providers = [
         provider.strip().lower()
         for provider in os.getenv("LLM_PROVIDERS", "gemini,groq").split(",")
@@ -141,7 +164,7 @@ def _provider_names() -> list[str]:
     ]
     if not providers:
         raise ProviderConfigurationError("LLM_PROVIDERS must name at least one provider")
-    unknown = set(providers) - {"gemini", "groq", "claude_code"}
+    unknown = set(providers) - {"gemini", "groq", "claude_code", "file"}
     if unknown:
         raise ProviderConfigurationError(
             f"Unsupported LLM provider(s): {', '.join(sorted(unknown))}"
@@ -366,17 +389,81 @@ def _call_groq(contents: list[Any], tool: Any):
     return _groq_response(response.json())
 
 
-def _call_provider(provider: str, contents: list[Any], tool: Any):
+FILE_REPLY_INSTRUCTIONS = """\
+Reply with the assistant's next turn.
+
+Plain text is taken as the assistant's answer. To call tools instead, reply
+with a JSON object shaped like an OpenAI assistant message:
+
+{"content": null,
+ "tool_calls": [{"id": "call_1", "type": "function",
+                 "function": {"name": "<tool name>", "arguments": {}}}]}
+
+"arguments" may be a JSON object or a JSON-encoded string. Call only the tools
+listed above, and use their exact names.
+"""
+
+
+def _normalize_file_tool_calls(message: dict[str, Any]) -> dict[str, Any]:
+    """Accept tool-call arguments as an object as well as an encoded string.
+
+    A person answering by hand will naturally write ``"arguments": {...}``,
+    while the OpenAI wire format requires a string. Normalizing here means
+    _groq_response() can parse a hand-written reply unchanged.
+    """
+    for tool_call in message.get("tool_calls") or []:
+        function = tool_call.get("function") if isinstance(tool_call, dict) else None
+        if isinstance(function, dict) and not isinstance(function.get("arguments"), str):
+            function["arguments"] = json.dumps(function.get("arguments") or {})
+    return message
+
+
+def _call_file(contents: list[Any], tool: Any, issue: str):
+    """Ask for the next turn through llm_calls/ and rebuild a Gemini response.
+
+    The prompt reuses the Groq translation, so the file shows the full
+    conversation and the tool schemas in one readable OpenAI-shaped payload.
+    """
+    prompt = (
+        "You are the model behind an SRE investigation agent.\n\n"
+        "===== CONVERSATION SO FAR (OpenAI chat format) =====\n"
+        f"{json.dumps(_groq_messages(contents), indent=2)}\n\n"
+        "===== TOOLS AVAILABLE =====\n"
+        f"{json.dumps(_groq_tools(tool), indent=2)}\n\n"
+        "===== HOW TO REPLY =====\n"
+        f"{FILE_REPLY_INSTRUCTIONS}"
+    )
+
+    reply = exchange(issue, prompt)
+
+    try:
+        message = extract_json(reply)
+    except ValueError:
+        # Prose, which is the common case: treat the file as the answer text.
+        return _groq_response({"choices": [{"message": {"content": reply}}]})
+
+    if not isinstance(message, dict):
+        return _groq_response({"choices": [{"message": {"content": reply}}]})
+    return _groq_response({"choices": [{"message": _normalize_file_tool_calls(message)}]})
+
+
+def _call_provider(provider: str, contents: list[Any], tool: Any, issue: str):
     logger.info("LLM provider: %s", provider)
     if provider == "gemini":
         return _call_gemini(contents, tool)
     if provider == "groq":
         return _call_groq(contents, tool)
+    if provider == "file":
+        return _call_file(contents, tool, issue)
     return invoke_claude_code(contents, tool=tool)
 
 
-def continue_gemini(contents, tool):
-    """Call a configured LLM and return the Gemini-compatible response shape."""
+def continue_gemini(contents, tool, issue: str = "agent"):
+    """Call a configured LLM and return the Gemini-compatible response shape.
+
+    ``issue`` only labels the request/response files used by the "file"
+    provider; the API providers ignore it.
+    """
     providers = _provider_names()
     strategy = os.getenv("LLM_STRATEGY", "fallback").lower()
     if strategy not in {"fallback", "random"}:
@@ -385,7 +472,7 @@ def continue_gemini(contents, tool):
     if strategy == "random":
         provider = random.choice(providers)
         try:
-            return _call_provider(provider, contents, tool)
+            return _call_provider(provider, contents, tool, issue)
         except Exception as error:
             if _is_transient(error):
                 raise ProvidersUnavailableError(f"{provider} is temporarily unavailable") from error
@@ -394,7 +481,7 @@ def continue_gemini(contents, tool):
     last_error = None
     for index, provider in enumerate(providers):
         try:
-            return _call_provider(provider, contents, tool)
+            return _call_provider(provider, contents, tool, issue)
         except Exception as error:
             if not _is_transient(error):
                 raise

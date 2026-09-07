@@ -78,6 +78,7 @@ Environment variables:
 - `RAGAS_MODEL`: optional separate model for Ragas judges; defaults to `GEMINI_MODEL`.
 - `RAG_EVAL_TENANT`: default evaluation tenant, `default`.
 - `RAG_EVAL_TOP_K`: default retrieval top-K, `5`.
+- `LLM_TRANSPORT`: set to `file` to answer every LLM call from `llm_calls/` instead of the Gemini API. See [File-backed LLM transport](file-llm-transport.md). `GEMINI_API_KEY` is still needed for embeddings.
 
 ## Interpretation
 

@@ -49,11 +49,13 @@ from ragas.metrics.collections import (
     FactualCorrectness,
 )
 
+from sre_copilot.llm_files import exchange, transport_is_enabled
 from sre_copilot.rag.evaluation.dataset import (
     EvaluationCase,
     build_ragas_dataset,
     load_cases,
 )
+from sre_copilot.rag.evaluation.file_llm import FileInstructorLLM, current_label
 from sre_copilot.rag.evaluation.metrics import retrieval_metrics
 from sre_copilot.rag.retriever import HybridRetriever
 
@@ -130,17 +132,32 @@ def _gemini_client() -> genai.Client:
 
 
 def generate_answer(
-    client: genai.Client,
+    client: genai.Client | None,
     question: str,
     contexts: list[str],
+    issue: str = "rag-eval",
 ) -> str:
-    """Generate an answer using the same Gemini configuration as the project."""
+    """Generate an answer using the same Gemini configuration as the project.
+
+    Under LLM_TRANSPORT=file the same prompt goes to llm_calls/ instead, so the
+    answer the evaluation scores is whatever the response file contains.
+    """
     context_text = "\n\n--- Retrieved context ---\n\n".join(contexts)
     prompt = (
         f"Question:\n{question}\n\n"
         f"Retrieved context:\n{context_text}\n\n"
         "Answer the question using only this retrieved context."
     )
+
+    if transport_is_enabled():
+        return exchange(
+            f"{issue}-answer",
+            f"===== SYSTEM INSTRUCTION =====\n{ANSWER_SYSTEM_PROMPT}\n"
+            f"===== USER PROMPT =====\n{prompt}",
+        )
+
+    if client is None:
+        raise RuntimeError("A Gemini client is required unless LLM_TRANSPORT=file")
 
     response = client.models.generate_content(
         model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
@@ -209,21 +226,29 @@ async def evaluate_with_ragas(
     if not results:
         return []
 
+    # AnswerRelevancy needs an embedding model, and nobody can answer an
+    # embedding request by hand, so embeddings stay on the API even under the
+    # file transport. That endpoint is separate from the chat models and was
+    # not the one returning 503.
     client = _gemini_client()
-    model = os.getenv("RAGAS_MODEL", os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"))
-    # llm_factory() would patch the Gemini client with instructor in sync mode,
-    # and the collections metrics only expose an async ascore(). Building the
-    # InstructorLLM directly lets us ask instructor for an async client.
-    evaluator_llm = InstructorLLM(
-        client=instructor.from_genai(client, use_async=True),
-        model=model,
-        provider="google",
-        temperature=0.0,
-    )
     evaluator_embeddings = GoogleEmbeddings(
         client=client,
         model=os.getenv("RAGAS_EMBEDDING_MODEL", "gemini-embedding-001"),
     )
+
+    if transport_is_enabled():
+        evaluator_llm = FileInstructorLLM()
+    else:
+        model = os.getenv("RAGAS_MODEL", os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"))
+        # llm_factory() would patch the Gemini client with instructor in sync mode,
+        # and the collections metrics only expose an async ascore(). Building the
+        # InstructorLLM directly lets us ask instructor for an async client.
+        evaluator_llm = InstructorLLM(
+            client=instructor.from_genai(client, use_async=True),
+            model=model,
+            provider="google",
+            temperature=0.0,
+        )
 
     metrics = {
         "context_precision": ContextPrecision(llm=evaluator_llm),
@@ -257,6 +282,11 @@ async def evaluate_with_ragas(
             # pass only the ones its ascore() signature actually declares.
             accepted = inspect.signature(metric.ascore).parameters
             metric_kwargs = {k: v for k, v in kwargs.items() if k in accepted}
+            # Ragas hands the evaluator LLM a prompt and nothing else, so the
+            # file transport has no way to know which case it is judging.
+            # Label it here and the request files come out named after the
+            # case and metric instead of a generic "ragas".
+            current_label.set(f"{case.case_id}-{name}")
             metric_result = await _retry_async(
                 f"[{case.case_id}] {name}",
                 lambda m=metric, mk=metric_kwargs: m.ascore(**mk),
@@ -326,12 +356,14 @@ async def async_main(args: argparse.Namespace) -> None:
     retriever = HybridRetriever()
     results = run_retrieval(retriever, cases, args.tenant, args.top_k)
 
-    client = _gemini_client()
+    # Under the file transport nothing here calls Gemini, so do not demand an
+    # API key just to build a client that stays unused.
+    client = None if transport_is_enabled() else _gemini_client()
     for result in results:
         result["response"] = await _retry_async(
             f"[{result['case_id']}] answer generation",
             lambda r=result: asyncio.to_thread(
-                generate_answer, client, r["question"], r["contexts"]
+                generate_answer, client, r["question"], r["contexts"], r["case_id"]
             ),
         )
 

@@ -40,6 +40,7 @@ def llm_node(state: AgentState, gemini_tool) -> AgentState:
     response = continue_gemini(
         state["messages"],
         gemini_tool,
+        issue=state.get("incident_id") or "agent",
     )
 
     return {
