@@ -49,6 +49,7 @@ def test_options_disable_claude_code_tool_execution(monkeypatch):
     assert captured["max_turns"] == 1
     assert captured["output_format"]["type"] == "json_schema"
     assert "list_metrics" in captured["system_prompt"]
+    assert "query_metrics" in captured["output_format"]["schema"]["properties"]["tool_name"]["enum"]
 
 
 @pytest.mark.asyncio
