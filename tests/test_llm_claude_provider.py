@@ -11,11 +11,21 @@ TOOL = SimpleNamespace(function_declarations=[])
 
 def test_claude_code_provider_can_be_selected(monkeypatch):
     expected = object()
+    received = {}
     monkeypatch.setenv("LLM_PROVIDERS", "claude_code")
     monkeypatch.setenv("LLM_STRATEGY", "fallback")
-    monkeypatch.setattr(llm, "invoke_claude_code", lambda contents: expected)
+
+    # Mirrors claude_code_llm.invoke, where ``tool`` is keyword-only and required.
+    def fake_invoke(contents, *, tool):
+        received["contents"] = contents
+        received["tool"] = tool
+        return expected
+
+    monkeypatch.setattr(llm, "invoke_claude_code", fake_invoke)
 
     assert llm.continue_gemini(CONTENTS, TOOL) is expected
+    assert received["contents"] is CONTENTS
+    assert received["tool"] is TOOL
 
 
 def test_gemini_provider_still_works(monkeypatch):
@@ -39,11 +49,11 @@ def test_unsupported_provider_fails_clearly(monkeypatch):
 
 def test_claude_code_failure_is_not_silently_fallen_back_to_gemini(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDERS", "claude_code,gemini")
-    monkeypatch.setattr(
-        llm,
-        "invoke_claude_code",
-        lambda contents: (_ for _ in ()).throw(RuntimeError("Claude failed")),
-    )
+
+    def fake_invoke(contents, *, tool):
+        raise RuntimeError("Claude failed")
+
+    monkeypatch.setattr(llm, "invoke_claude_code", fake_invoke)
     monkeypatch.setattr(llm.genai, "Client", lambda **kwargs: pytest.fail("Gemini fallback must be explicit"))
 
     with pytest.raises(RuntimeError, match="Claude failed"):
