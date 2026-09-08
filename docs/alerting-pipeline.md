@@ -88,7 +88,7 @@ Then run a service that exposes Prometheus metrics with `tenant` and `service` l
 Inspect the topic:
 
 ```bash
-docker exec $(docker ps -qf name=alerting-kafka) \
+docker compose -f infra/docker-compose.alerting.yml exec kafka \
   kafka-console-consumer --bootstrap-server kafka:9092 \
   --topic incidents --from-beginning
 ```
