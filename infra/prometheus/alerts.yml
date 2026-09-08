@@ -1,11 +1,12 @@
 groups:
   - name: sre-copilot-service-health
     rules:
-      - alert: ServiceHighLatency
+      # Matches the payment-api simulator used by the local SRE Copilot demo.
+      - alert: PaymentAPIHighLatency
         expr: |
           histogram_quantile(0.99,
             sum by (le, tenant, service) (
-              rate(http_request_duration_seconds_bucket[5m])
+              rate(payment_api_request_duration_seconds_bucket[5m])
             )
           ) > 1
         for: 1m
@@ -29,6 +30,7 @@ groups:
           summary: "5xx error rate on {{ $labels.service }} exceeds 5%"
           description: "Tenant {{ $labels.tenant }} service {{ $labels.service }} has elevated server errors."
 
+      # Generic rule for services exposing process_cpu_seconds_total.
       - alert: ServiceHighCPU
         expr: |
           100 * avg by (tenant, service) (rate(process_cpu_seconds_total[5m])) > 80
@@ -39,7 +41,7 @@ groups:
           summary: "CPU usage on {{ $labels.service }} exceeds 80%"
           description: "Tenant {{ $labels.tenant }} service {{ $labels.service }} has sustained high CPU."
 
-      - alert: ServiceDatabaseErrors
+      - alert: PaymentAPIDatabaseErrors
         expr: |
           sum by (tenant, service) (rate(payment_api_database_errors_total[5m])) > 1
         for: 1m
