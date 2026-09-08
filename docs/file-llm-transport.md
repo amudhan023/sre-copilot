@@ -33,9 +33,21 @@ LLM_TRANSPORT=file uv run python scripts/rag_eval.py
 in. The switch is global: it covers agent turns, evaluation answer
 generation, and the Ragas judge calls.
 
-You can also list `file` in `LLM_PROVIDERS` (for example
-`LLM_PROVIDERS=gemini,groq,file`) to use it only as a last-resort fallback
-after the API providers fail.
+You can also list `file` in `LLM_PROVIDERS` to keep it as a last-resort
+backup that only runs once the API providers give up. The valid names are
+`gemini`, `groq`, `claude_code` and `file`, and with `LLM_STRATEGY=fallback`
+they are tried left to right:
+
+```bash
+LLM_PROVIDERS=gemini,groq,claude_code,file
+```
+
+A provider is only skipped for a *transient* failure (HTTP 429 or 503, or a
+timeout); anything else stops the chain, because retrying a rejected request
+on another provider just wastes the next one. The Claude Code provider wraps
+every SDK error in `ClaudeCodeRequestError`, so `_status_code` in
+`agent/llm.py` follows the `__cause__` chain to find the original status —
+without that, a Claude overload would look permanent and never reach `file`.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -62,8 +74,21 @@ There are two reply formats.
    next request repeats the prompt with the rejection and the schema error
    attached.
 
-Agent turns have a third option: reply with an OpenAI-shaped assistant
-message to call a tool.
+### Calling a tool from an agent turn
+
+An agent turn has a third option: ask for a tool call instead of answering.
+The request file spells this out, and the shape it asks for is the same one
+the Claude Code provider uses, so both providers answer the same contract.
+
+```json
+{"action": "tool",
+ "tool_name": "search_similar_incidents",
+ "arguments": {"query": "connection pool exhaustion"}}
+```
+
+`{"action": "final", "answer": "..."}` is the explicit way to finish, though
+plain prose does the same thing. The OpenAI assistant-message shape still
+works too, and so does a bare `{"name": ..., "args": {...}}`:
 
 ```json
 {"content": null,
@@ -72,9 +97,23 @@ message to call a tool.
                               "arguments": {"query": "connection pool"}}}]}
 ```
 
-`arguments` may be an object or a JSON-encoded string; both work. Tenant
-scoping still happens in `tool_node`, so a tenant written into the arguments
-is overwritten — the file transport does not widen the security boundary.
+`arguments` may be an object or a JSON-encoded string; both work.
+
+Three rules keep this safe:
+
+- **A reply is only read as a tool call when it has one of those shapes.**
+  A final report often quotes a JSON log line, and that has to stay prose.
+  Anything else JSON-shaped is kept whole as the answer.
+- **Tool names are checked against the tools listed in the request.** An
+  invented name is rejected in `agent/llm.py` rather than failing later as an
+  opaque MCP error.
+- **A reply that is neither an answer nor a tool call is an error.** It would
+  otherwise produce a message with no parts, which `route_after_llm` reads as
+  "the model is finished" — ending the investigation with an empty report.
+
+Tenant scoping still happens in `tool_node`, so a tenant written into the
+arguments is overwritten. The file transport does not widen the security
+boundary.
 
 ## Two things to know
 

@@ -1,12 +1,14 @@
+import asyncio
 import json
 import threading
 import time
 from types import SimpleNamespace
 
 import pytest
+from langgraph.graph import END
 
 from sre_copilot import llm_files
-from sre_copilot.agent import llm
+from sre_copilot.agent import graph, llm, nodes
 
 # Tests the file-backed LLM transport in sre_copilot/llm_files.py: how a
 # caller label becomes a file name, what a request file says, how the poll
@@ -256,3 +258,146 @@ def test_json_reply_with_encoded_arguments_is_accepted(monkeypatch):
     assert response.candidates[0].content.parts[0].function_call.args == {
         "service": "payment-api"
     }
+
+
+def test_claude_shaped_reply_becomes_a_tool_call(monkeypatch):
+    """The action/tool_name form is what the request file asks for."""
+    reply = json.dumps({
+        "action": "tool",
+        "tool_name": "list_metrics",
+        "arguments": {"service": "payment-api"},
+        "answer": None,
+    })
+    monkeypatch.setattr(llm, "exchange", lambda issue, prompt: reply)
+
+    call = llm._call_file(CONTENTS, TOOL, "INC-1042").candidates[0].content.parts[0].function_call
+
+    assert (call.name, call.args) == ("list_metrics", {"service": "payment-api"})
+
+
+def test_claude_shaped_final_answer_becomes_text(monkeypatch):
+    reply = json.dumps({"action": "final", "tool_name": None, "arguments": {}, "answer": "Pool exhausted."})
+    monkeypatch.setattr(llm, "exchange", lambda issue, prompt: reply)
+
+    parts = llm._call_file(CONTENTS, TOOL, "INC-1042").candidates[0].content.parts
+
+    assert [part.text for part in parts] == ["Pool exhausted."]
+
+
+def test_a_fenced_tool_call_is_accepted(monkeypatch):
+    reply = '```json\n{"action": "tool", "tool_name": "list_metrics", "arguments": {}}\n```'
+    monkeypatch.setattr(llm, "exchange", lambda issue, prompt: reply)
+
+    call = llm._call_file(CONTENTS, TOOL, "INC-1042").candidates[0].content.parts[0].function_call
+
+    assert call.name == "list_metrics"
+
+
+def test_a_bare_name_and_args_object_is_accepted(monkeypatch):
+    reply = json.dumps({"name": "list_metrics", "args": {"service": "payment-api"}})
+    monkeypatch.setattr(llm, "exchange", lambda issue, prompt: reply)
+
+    call = llm._call_file(CONTENTS, TOOL, "INC-1042").candidates[0].content.parts[0].function_call
+
+    assert (call.name, call.args) == ("list_metrics", {"service": "payment-api"})
+
+
+def test_a_final_answer_quoting_json_stays_prose(monkeypatch):
+    """A JSON log line inside an RCA must not be mistaken for a tool call.
+
+    Without a shape check the answer would be replaced by an unusable
+    message with no parts, and route_after_llm would end the run silently.
+    """
+    reply = 'Likely root cause: pool exhaustion. Log line: {"err": "timeout", "pool": 20}'
+    monkeypatch.setattr(llm, "exchange", lambda issue, prompt: reply)
+
+    parts = llm._call_file(CONTENTS, TOOL, "INC-1042").candidates[0].content.parts
+
+    assert [part.text for part in parts] == [reply]
+
+
+def test_a_tool_name_that_does_not_exist_is_rejected(monkeypatch):
+    reply = json.dumps({"action": "tool", "tool_name": "guess_the_cause", "arguments": {}})
+    monkeypatch.setattr(llm, "exchange", lambda issue, prompt: reply)
+
+    with pytest.raises(llm.ProviderRequestError, match="guess_the_cause"):
+        llm._call_file(CONTENTS, TOOL, "INC-1042")
+
+
+@pytest.mark.parametrize("reply", [
+    json.dumps({"action": "final", "answer": ""}),
+    json.dumps({"action": "explain", "answer": "..."}),
+    json.dumps({"tool_calls": [{"id": "call_1"}]}),
+    json.dumps({"action": "tool", "tool_name": "list_metrics", "arguments": "not json"}),
+])
+def test_an_unusable_reply_fails_loudly(monkeypatch, reply):
+    """Never return a response with no parts: the graph reads that as 'done'."""
+    monkeypatch.setattr(llm, "exchange", lambda issue, prompt: reply)
+
+    with pytest.raises(llm.ProviderRequestError):
+        llm._call_file(CONTENTS, TOOL, "INC-1042")
+
+
+# --- the file reply travelling through the LangGraph nodes -----------------
+
+GRAPH_TOOL = SimpleNamespace(function_declarations=[SimpleNamespace(
+    name="search_similar_incidents",
+    description="Search past incidents",
+    parameters={"type": "object", "properties": {}},
+)])
+
+
+class FakeSession:
+    """Stands in for the MCP session tool_node calls."""
+
+    def __init__(self):
+        self.calls = []
+
+    async def call_tool(self, name, arguments):
+        self.calls.append((name, arguments))
+        return SimpleNamespace(content="INC-9 database connection pool exhausted")
+
+
+def test_a_file_reply_drives_the_langgraph_tool_loop(monkeypatch):
+    """End to end: response file -> llm_node -> route_after_llm -> tool_node.
+
+    This is the contract that matters. llm_node stores the response's content
+    on the state, route_after_llm looks for a function_call part to decide
+    whether to keep going, and tool_node reads .name and .args off it.
+    """
+    monkeypatch.setenv("LLM_TRANSPORT", "file")
+    monkeypatch.setattr(llm, "exchange", lambda issue, prompt: json.dumps({
+        "action": "tool",
+        "tool_name": "search_similar_incidents",
+        "arguments": {"tenant": "attacker", "query": "connection pool timeouts"},
+    }))
+
+    state = {
+        "messages": list(CONTENTS),
+        "incident_id": "INC-1042",
+        "tenant": "acme",
+    }
+    state["messages"] += nodes.llm_node(state, GRAPH_TOOL)["messages"]
+
+    assert graph.route_after_llm(state) == "tool"
+
+    session = FakeSession()
+    result = asyncio.run(nodes.tool_node(state, session))
+
+    # tenant comes from the incident, never from the reply file.
+    assert session.calls == [(
+        "search_similar_incidents",
+        {"tenant": "acme", "query": "connection pool timeouts"},
+    )]
+    assert "INC-9" in result["messages"][0]["parts"][0]["text"]
+
+
+def test_a_final_answer_from_a_file_ends_the_loop(monkeypatch):
+    monkeypatch.setenv("LLM_TRANSPORT", "file")
+    monkeypatch.setattr(llm, "exchange", lambda issue, prompt: "Root cause: pool exhaustion.")
+
+    state = {"messages": list(CONTENTS), "incident_id": "INC-1042", "tenant": "acme"}
+    state["messages"] += nodes.llm_node(state, GRAPH_TOOL)["messages"]
+
+    assert graph.route_after_llm(state) == END
+    assert state["messages"][-1].parts[0].text == "Root cause: pool exhaustion."

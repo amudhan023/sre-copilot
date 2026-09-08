@@ -180,14 +180,25 @@ def _api_key(provider: str) -> str:
     return key
 
 
-def _status_code(error: Exception) -> int | None:
-    for value in (
-        getattr(error, "status_code", None),
-        getattr(error, "code", None),
-        getattr(getattr(error, "response", None), "status_code", None),
-    ):
-        if isinstance(value, int):
-            return value
+def _status_code(error: BaseException | None) -> int | None:
+    """Find an HTTP status on an error, looking through anything wrapping it.
+
+    The Claude provider re-raises every SDK failure as ClaudeCodeRequestError,
+    which carries no status of its own. Without walking __cause__ an upstream
+    429 or 503 would look permanent, and the fallback chain would stop instead
+    of moving on to the next provider.
+    """
+    seen: set[int] = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        for value in (
+            getattr(error, "status_code", None),
+            getattr(error, "code", None),
+            getattr(getattr(error, "response", None), "status_code", None),
+        ):
+            if isinstance(value, int):
+                return value
+        error = error.__cause__
     return None
 
 
@@ -390,32 +401,141 @@ def _call_groq(contents: list[Any], tool: Any):
 
 
 FILE_REPLY_INSTRUCTIONS = """\
-Reply with the assistant's next turn.
+Reply with the assistant's next turn, in one of two ways.
 
-Plain text is taken as the assistant's answer. To call tools instead, reply
-with a JSON object shaped like an OpenAI assistant message:
+1. To finish the investigation, write the final answer as plain text. The
+   whole file is taken as the answer, so follow the report format in the
+   system instruction above.
+
+2. To call a tool instead, reply with a single JSON object shaped exactly
+   like this:
+
+{"action": "tool",
+ "tool_name": "<one of the tool names listed above>",
+ "arguments": {"<argument name>": "<value>"}}
+
+Call one of the listed tools, spell its name exactly as listed, and make the
+arguments match that tool's schema. A ```json fence around the object is
+fine. Do not mix the two styles: if the file contains that JSON object, the
+surrounding prose is ignored.
+
+An OpenAI assistant message is also accepted, for anything that already
+produces that shape:
 
 {"content": null,
  "tool_calls": [{"id": "call_1", "type": "function",
                  "function": {"name": "<tool name>", "arguments": {}}}]}
-
-"arguments" may be a JSON object or a JSON-encoded string. Call only the tools
-listed above, and use their exact names.
 """
 
 
-def _normalize_file_tool_calls(message: dict[str, Any]) -> dict[str, Any]:
-    """Accept tool-call arguments as an object as well as an encoded string.
+def _file_tool_call(
+    name: Any, arguments: Any, call_id: Any, tool_names: set[str]
+) -> dict[str, Any]:
+    """Validate one requested call and encode it the way _groq_response wants.
 
-    A person answering by hand will naturally write ``"arguments": {...}``,
-    while the OpenAI wire format requires a string. Normalizing here means
-    _groq_response() can parse a hand-written reply unchanged.
+    Tool names are checked here rather than in tool_node because an invented
+    name would otherwise travel all the way to session.call_tool() and fail
+    as an opaque MCP error. Arguments arrive either as an object (what a
+    person writes by hand) or as a JSON-encoded string (the OpenAI wire
+    format); both are accepted and stored as a string.
     """
-    for tool_call in message.get("tool_calls") or []:
-        function = tool_call.get("function") if isinstance(tool_call, dict) else None
-        if isinstance(function, dict) and not isinstance(function.get("arguments"), str):
-            function["arguments"] = json.dumps(function.get("arguments") or {})
-    return message
+    if not isinstance(name, str) or name not in tool_names:
+        raise ProviderRequestError(
+            f"The response file asked for tool {name!r}, which is not one of: "
+            f"{', '.join(sorted(tool_names))}"
+        )
+    if isinstance(arguments, str):
+        try:
+            arguments = json.loads(arguments or "{}")
+        except json.JSONDecodeError as error:
+            raise ProviderRequestError(
+                f"The response file's arguments for {name} are not valid JSON"
+            ) from error
+    if arguments is None:
+        arguments = {}
+    if not isinstance(arguments, dict):
+        raise ProviderRequestError(
+            f"The response file's arguments for {name} must be a JSON object"
+        )
+    return {
+        "id": call_id if isinstance(call_id, str) and call_id else f"file_{name}",
+        "type": "function",
+        "function": {"name": name, "arguments": json.dumps(arguments)},
+    }
+
+
+def _file_reply_message(reply: str, tool_names: set[str]) -> dict[str, Any]:
+    """Turn a response file into an OpenAI-shaped assistant message.
+
+    The graph only continues while the model's last message carries a
+    function_call part (see graph.route_after_llm), so getting this shape
+    wrong ends an investigation silently with an empty answer. That is why a
+    reply is only read as a tool request when it actually looks like one:
+    a final RCA often quotes a JSON log line, and that must stay prose.
+
+    Three request shapes are recognised, all of them producing the same
+    message: the action/tool_name form documented above (which matches what
+    the Claude Code provider asks for), the OpenAI tool_calls form, and a
+    bare {"name": ..., "args": ...} call.
+    """
+    try:
+        decision = extract_json(reply)
+    except ValueError:
+        return {"content": reply}
+
+    if not isinstance(decision, dict):
+        return {"content": reply}
+
+    action = decision.get("action")
+    if action == "final":
+        answer = decision.get("answer")
+        if not isinstance(answer, str) or not answer.strip():
+            raise ProviderRequestError(
+                "The response file chose action 'final' without an answer"
+            )
+        return {"content": answer}
+    if action == "tool":
+        return {"content": None, "tool_calls": [_file_tool_call(
+            decision.get("tool_name"), decision.get("arguments"),
+            decision.get("id"), tool_names,
+        )]}
+    if action is not None:
+        raise ProviderRequestError(
+            f"The response file used an unknown action {action!r}; "
+            "expected 'tool' or 'final'"
+        )
+
+    raw_calls = decision.get("tool_calls")
+    if isinstance(raw_calls, list) and raw_calls:
+        calls = []
+        for raw in raw_calls:
+            function = raw.get("function") if isinstance(raw, dict) else None
+            if not isinstance(function, dict):
+                raise ProviderRequestError(
+                    "The response file has a malformed tool_calls entry"
+                )
+            calls.append(_file_tool_call(
+                function.get("name"), function.get("arguments"),
+                raw.get("id"), tool_names,
+            ))
+        content = decision.get("content")
+        return {
+            "content": content if isinstance(content, str) else None,
+            "tool_calls": calls,
+        }
+
+    nested = decision.get("function_call")
+    call = nested if isinstance(nested, dict) else decision
+    name = call.get("name")
+    if isinstance(name, str) and name in tool_names:
+        arguments = call.get("args") if "args" in call else call.get("arguments")
+        return {"content": None, "tool_calls": [
+            _file_tool_call(name, arguments, call.get("id"), tool_names)
+        ]}
+
+    # Some other JSON object, so the file is prose that happened to contain
+    # one. Keep the whole file as the answer rather than throwing it away.
+    return {"content": reply}
 
 
 def _call_file(contents: list[Any], tool: Any, issue: str):
@@ -424,27 +544,29 @@ def _call_file(contents: list[Any], tool: Any, issue: str):
     The prompt reuses the Groq translation, so the file shows the full
     conversation and the tool schemas in one readable OpenAI-shaped payload.
     """
+    tools = _groq_tools(tool)
     prompt = (
         "You are the model behind an SRE investigation agent.\n\n"
         "===== CONVERSATION SO FAR (OpenAI chat format) =====\n"
         f"{json.dumps(_groq_messages(contents), indent=2)}\n\n"
         "===== TOOLS AVAILABLE =====\n"
-        f"{json.dumps(_groq_tools(tool), indent=2)}\n\n"
+        f"{json.dumps(tools, indent=2)}\n\n"
         "===== HOW TO REPLY =====\n"
         f"{FILE_REPLY_INSTRUCTIONS}"
     )
 
     reply = exchange(issue, prompt)
+    message = _file_reply_message(
+        reply, {item["function"]["name"] for item in tools}
+    )
 
-    try:
-        message = extract_json(reply)
-    except ValueError:
-        # Prose, which is the common case: treat the file as the answer text.
-        return _groq_response({"choices": [{"message": {"content": reply}}]})
-
-    if not isinstance(message, dict):
-        return _groq_response({"choices": [{"message": {"content": reply}}]})
-    return _groq_response({"choices": [{"message": _normalize_file_tool_calls(message)}]})
+    # A message with neither text nor a tool call becomes a response with no
+    # parts, which route_after_llm reads as "the model is done". Fail instead.
+    if not message.get("content") and not message.get("tool_calls"):
+        raise ProviderRequestError(
+            f"The response file for {issue} held neither an answer nor a tool call"
+        )
+    return _groq_response({"choices": [{"message": message}]})
 
 
 def _call_provider(provider: str, contents: list[Any], tool: Any, issue: str):
