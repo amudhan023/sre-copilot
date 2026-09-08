@@ -1,0 +1,51 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.7.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.7.1
+    depends_on: [zookeeper]
+    ports: ["29092:29092"]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,HOST://localhost:29092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,HOST://0.0.0.0:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.7.1
+    depends_on: [kafka]
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      cub kafka-ready -b kafka:9092 1 30 &&
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists
+      --topic incidents --partitions 3 --replication-factor 1
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    depends_on: [kafka, redis]
+    ports: ["9093:9093"]
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    depends_on: [alertmanager]
+    ports: ["9090:9090"]
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+
+# The receiver is intentionally a host process for local development:
+#   uv run uvicorn sre_copilot.alerting.receiver:app --host 0.0.0.0 --port 8080
