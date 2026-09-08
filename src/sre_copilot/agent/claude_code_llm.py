@@ -46,6 +46,18 @@ def _int_env(name: str, default: int) -> int:
     return value
 
 
+def _json_schema(value: Any) -> Any:
+    if hasattr(value, "value") and not isinstance(value, (dict, list, str, int, float, bool)):
+        return value.value
+    if hasattr(value, "model_dump"):
+        return _json_schema(value.model_dump(exclude_none=True))
+    if isinstance(value, dict):
+        return {key: _json_schema(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_schema(item) for item in value]
+    return value
+
+
 def _messages_to_prompt(contents: list[Any]) -> str:
     """Serialize Gemini-shaped history while preserving tool requests/results."""
     lines: list[str] = []
@@ -83,9 +95,11 @@ def _tool_definitions(tool: Any) -> list[dict[str, Any]]:
         name = getattr(declaration, "name", None)
         if not name:
             raise ClaudeCodeRequestError("Malformed Gemini-compatible tool definition")
+        parameters = getattr(declaration, "parameters", None)
         definitions.append({
             "name": name,
             "description": getattr(declaration, "description", "") or "",
+            "parameters": _json_schema(parameters) if parameters is not None else {},
         })
     if not definitions:
         raise ClaudeCodeRequestError("No MCP tools were supplied to Claude Code")
@@ -101,14 +115,18 @@ def _options(tool: Any) -> Any:
 
     tools = _tool_definitions(tool)
     tool_catalog = "\n".join(
-        f"- {item['name']}: {item['description']}" for item in tools
+        f"- {item['name']}: {item['description']}\n  Arguments schema: {json.dumps(item['parameters'], sort_keys=True)}"
+        for item in tools
     )
+    tool_names = [item["name"] for item in tools]
     system_prompt = (
         f"{SYSTEM_INSTRUCTION}\n\n"
         "You are running behind an application-controlled LangGraph tool loop. "
         "Do not execute tools yourself. Decide either to call exactly one of the "
         "listed MCP tools or to provide the final answer. Return only the requested "
-        "structured decision. Tool arguments must match the selected tool schema.\n\n"
+        "structured decision. Tool arguments must match the selected tool schema. "
+        "If more investigation is needed, choose a tool action; do not provide a "
+        "partial final answer.\n\n"
         "Available MCP tools:\n"
         f"{tool_catalog}"
     )
@@ -129,7 +147,7 @@ def _options(tool: Any) -> Any:
                 "type": "object",
                 "properties": {
                     "action": {"type": "string", "enum": ["tool", "final"]},
-                    "tool_name": {"type": ["string", "null"]},
+                    "tool_name": {"type": ["string", "null"], "enum": tool_names + [None]},
                     "arguments": {"type": "object", "additionalProperties": True},
                     "answer": {"type": ["string", "null"]},
                 },
