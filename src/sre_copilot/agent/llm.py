@@ -372,7 +372,7 @@ def _call_provider(provider: str, contents: list[Any], tool: Any):
         return _call_gemini(contents, tool)
     if provider == "groq":
         return _call_groq(contents, tool)
-    return invoke_claude_code(contents)
+    return invoke_claude_code(contents, tool=tool)
 
 
 def continue_gemini(contents, tool):
