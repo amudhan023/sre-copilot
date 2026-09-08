@@ -2,8 +2,7 @@ global:
   resolve_timeout: 5m
 
 route:
-  # One service incident can have several symptoms (latency, errors, etc.).
-  # Group them so the agent investigates one incident instead of several pages.
+  # Group correlated symptoms into one incident for the agent.
   group_by: ["tenant", "service"]
   group_wait: 30s
   group_interval: 5m
@@ -13,5 +12,6 @@ route:
 receivers:
   - name: sre-copilot
     webhook_configs:
-      - url: http://localhost:8080/alerts
+      # Receiver runs on the host during local development.
+      - url: http://host.docker.internal:8080/alerts
         send_resolved: true
