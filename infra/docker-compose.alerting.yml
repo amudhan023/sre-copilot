@@ -36,6 +36,8 @@ services:
     image: prom/alertmanager:v0.28.1
     depends_on: [kafka, redis]
     ports: ["9093:9093"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
 
@@ -43,6 +45,8 @@ services:
     image: prom/prometheus:v3.5.0
     depends_on: [alertmanager]
     ports: ["9090:9090"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
