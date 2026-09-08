@@ -1,3 +1,4 @@
+import asyncio
 from functools import partial
 
 from langgraph.graph import StateGraph, END
@@ -27,7 +28,13 @@ def build_graph(session, gemini_tool):
     graph = StateGraph(AgentState)
 
     async def llm(state):
-        return llm_node(
+        # The provider boundary is intentionally synchronous because Gemini
+        # and Groq are synchronous today. Claude Code's SDK is async, so its
+        # synchronous adapter runs an event loop internally. Keep all of that
+        # off LangGraph's event loop so Claude does not hit asyncio.run() from
+        # an already-running loop.
+        return await asyncio.to_thread(
+            llm_node,
             state,
             gemini_tool,
         )
