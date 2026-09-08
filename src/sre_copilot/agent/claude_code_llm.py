@@ -180,8 +180,6 @@ def _result_from_messages(messages: list[Any], tool: Any) -> types.GenerateConte
             )
         raise ClaudeCodeRequestError("Claude Code returned an invalid structured action")
 
-    # Keep a defensive compatibility path for SDK/client fakes that expose
-    # AssistantMessage text, but never treat Claude Code's own tools as MCP calls.
     parts: list[types.Part] = []
     for message in messages:
         if AssistantMessage is None or not isinstance(message, AssistantMessage):
@@ -219,14 +217,14 @@ async def _consume_query(
     return _result_from_messages(messages, tool)
 
 
-async def invoke(
+async def invoke_async(
     contents: list[Any],
     *,
     tool: Any,
     timeout_seconds: int | None = None,
     client: Callable[..., AsyncIterator[Any]] | None = None,
 ) -> types.GenerateContentResponse:
-    """Invoke Claude Code and return a Gemini-compatible text/tool-call response."""
+    """Invoke Claude Code asynchronously and return a Gemini-compatible response."""
     if query is None and client is None:
         raise ClaudeCodeUnavailableError(
             "claude-agent-sdk is not installed; install the project dependency before using LLM_PROVIDER=claude_code"
@@ -251,6 +249,13 @@ async def invoke(
     return response
 
 
-def invoke_sync(contents: list[Any], *, tool: Any) -> types.GenerateContentResponse:
-    """Synchronous adapter for the existing provider boundary."""
-    return asyncio.run(invoke(contents, tool=tool))
+def invoke(
+    contents: list[Any],
+    *,
+    tool: Any,
+    timeout_seconds: int | None = None,
+) -> types.GenerateContentResponse:
+    """Synchronous provider boundary used by the existing LangGraph node."""
+    return asyncio.run(
+        invoke_async(contents, tool=tool, timeout_seconds=timeout_seconds)
+    )
