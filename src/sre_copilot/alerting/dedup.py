@@ -9,15 +9,11 @@ logger = logging.getLogger(__name__)
 
 class Deduplicator(Protocol):
     def claim(self, key: str, ttl_seconds: int) -> bool: ...
+    def release(self, key: str) -> None: ...
 
 
 class RedisDeduplicator:
-    """Redis-backed best-effort deduplication.
-
-    SET NX EX is atomic. Redis is deliberately non-authoritative: if it is
-    unavailable we fail open so an alert can still reach Kafka. A duplicate is
-    recoverable; a dropped incident is not.
-    """
+    """Redis-backed best-effort deduplication using atomic SET NX EX."""
 
     def __init__(self, url: str | None = None):
         import redis
@@ -35,9 +31,15 @@ class RedisDeduplicator:
             logger.exception("Redis dedup unavailable; failing open for %s", key)
             return True
 
+    def release(self, key: str) -> None:
+        try:
+            self._client.delete(key)
+        except Exception:
+            logger.exception("Could not release Redis dedup key %s", key)
+
 
 class InMemoryDeduplicator:
-    """Small test double with the same claim semantics."""
+    """Small test double with the same claim/release semantics."""
 
     def __init__(self):
         self._keys: set[str] = set()
@@ -48,3 +50,6 @@ class InMemoryDeduplicator:
             return False
         self._keys.add(key)
         return True
+
+    def release(self, key: str) -> None:
+        self._keys.discard(key)
