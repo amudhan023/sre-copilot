@@ -6,35 +6,30 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-
 SCHEMA = "sre-copilot.incident.v1"
-
-
-def _first(alert: dict[str, Any], *keys: str) -> str | None:
-    for key in keys:
-        value = alert.get(key)
-        if value:
-            return str(value)
-    return None
 
 
 def _stable_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
 
 
-def incident_fingerprint(tenant: str, service: str, alerts: list[dict[str, Any]]) -> str:
-    """Create a stable fingerprint for a grouped Alertmanager notification."""
-    identities = []
-    for alert in alerts:
-        labels = alert.get("labels") or {}
-        identities.append({
-            "alertname": labels.get("alertname") or labels.get("alert_name"),
-            "severity": labels.get("severity"),
-            # Alertmanager's fingerprint is stable across repeat notifications.
-            "fingerprint": alert.get("fingerprint"),
-        })
-    identities.sort(key=_stable_json)
-    raw = _stable_json({"tenant": tenant, "service": service, "alerts": identities})
+def incident_fingerprint(
+    tenant: str, service: str, alerts: list[dict[str, Any]], group_key: str | None = None
+) -> str:
+    """Create a stable fingerprint for one Alertmanager group."""
+    if group_key:
+        raw = f"{tenant}|{service}|{group_key}"
+    else:
+        identities = []
+        for alert in alerts:
+            labels = alert.get("labels") or {}
+            identities.append({
+                "alertname": labels.get("alertname") or labels.get("alert_name"),
+                "severity": labels.get("severity"),
+                "fingerprint": alert.get("fingerprint"),
+            })
+        identities.sort(key=_stable_json)
+        raw = _stable_json({"tenant": tenant, "service": service, "alerts": identities})
     return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
 
@@ -98,12 +93,14 @@ def alertmanager_to_event(payload: dict[str, Any]) -> IncidentEvent:
     })
     severities = [str((alert.get("labels") or {}).get("severity"))
                   for alert in alerts if (alert.get("labels") or {}).get("severity")]
-    severity = max(severities, key=lambda s: {"critical": 4, "warning": 3, "info": 1}.get(s.lower(), 2), default="unknown")
+    severity = max(
+        severities,
+        key=lambda s: {"critical": 4, "warning": 3, "info": 1}.get(s.lower(), 2),
+        default="unknown",
+    )
 
-    fingerprint = incident_fingerprint(tenant, service, alerts)
+    fingerprint = incident_fingerprint(tenant, service, alerts, payload.get("groupKey"))
     incident_key = f"{tenant}/{service}/{fingerprint}"
-    # Alertmanager's groupKey is useful for correlation but is not guaranteed to
-    # be present in every test/manual webhook, so use a deterministic ID here.
     incident_id = hashlib.sha256(incident_key.encode()).hexdigest()[:24]
     starts = [a.get("startsAt") for a in alerts if a.get("startsAt")]
 
