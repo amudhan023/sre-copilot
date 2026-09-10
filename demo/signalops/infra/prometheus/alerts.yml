@@ -1,0 +1,26 @@
+groups:
+  - name: payment-api
+    rules:
+      - alert: PaymentAPIHighLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum by (le, tenant, service) (
+              rate(payment_api_request_duration_seconds_bucket[5m])
+            )
+          ) > 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "p99 latency on {{ $labels.service }} is {{ $value | humanizeDuration }}"
+
+      - alert: PaymentAPIDatabaseErrors
+        expr: |
+          sum by (tenant, service) (
+            rate(payment_api_database_errors_total[5m])
+          ) > 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} database errors: {{ $value }}/s"
