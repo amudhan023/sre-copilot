@@ -26,6 +26,7 @@ dependencies = [
     "pgvector>=0.5.0",
     "ragas>=0.4.3,<0.5",
     "jsonref>=1.1.0",
+    "observe-mcp-server",
 ]
 
 [dependency-groups]
@@ -34,6 +35,11 @@ dev = [
     "pytest-asyncio",
     "httpx",
 ]
+
+# Sibling checkout for now. Once github.com/amudhan023/observe-mcp-server
+# exists, switch to: { git = "https://github.com/amudhan023/observe-mcp-server" }
+[tool.uv.sources]
+observe-mcp-server = { path = "../observe-mcp-server", editable = true }
 
 [tool.setuptools.packages.find]
 where = ["src"]

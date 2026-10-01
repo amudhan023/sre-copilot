@@ -24,7 +24,7 @@ Important:
 
 Tenant isolation:
     Every retrieval is scoped to the incident's tenant. The tenant is
-    supplied by the caller (the agent state, via the MCP tool) and is
+    supplied by the caller (the agent state, via tool_node) and is
     passed straight through to ``HybridRetriever.retrieve``. There is no
     default and no unscoped search path.
 
@@ -47,12 +47,12 @@ MAX_INCIDENTS = 5
 # results. This costs no extra model work: the cross-encoder scores every
 # candidate it is handed and only then truncates to top_k (see
 # rag/reranker.py), so a larger top_k just keeps rows that were already
-# scored. The MCP response is still capped at MAX_INCIDENTS.
+# scored. The tool response is still capped at MAX_INCIDENTS.
 TOP_K = RRF_LIMIT
 
 # The retriever owns the BGE-M3 embedder and the BGE cross-encoder, so it is
 # built once and reused. It is created lazily rather than at import time so
-# that importing this module (for the MCP server, or for a unit test) does
+# that importing this module (for the agent, or for a unit test) does
 # not load the models until an incident search actually needs them.
 _retriever: HybridRetriever | None = None
 

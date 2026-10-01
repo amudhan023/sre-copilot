@@ -1,4 +1,4 @@
-from sre_copilot.mcp_tools.incidents import find_similar_incidents
+from sre_copilot.rag.incidents import find_similar_incidents
 
 # Local development/testing tenant. Ingestion writes the sample incidents
 # under this tenant (see sre_copilot/rag/ingest.py).

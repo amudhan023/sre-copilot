@@ -1,10 +1,10 @@
 import pytest
 
-from sre_copilot.mcp_tools import incidents
+from sre_copilot.rag import incidents
 
-# Tests the historical incident MCP tool against a fake HybridRetriever, so
+# Tests the historical incident tool against a fake HybridRetriever, so
 # the real BGE-M3 / BGE reranker models and PostgreSQL are never touched.
-# What matters here is the contract between the MCP tool and the retriever:
+# What matters here is the contract between the tool and the retriever:
 # the tenant reaches retrieve() untouched, and chunks collapse back into one
 # entry per historical incident.
 
